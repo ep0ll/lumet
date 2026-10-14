@@ -40,9 +40,19 @@ github.com/containerd/ttrpc
 # github.com/containerd/typeurl/v2 v2.3.0
 ## explicit; go 1.21
 github.com/containerd/typeurl/v2
+# github.com/dexnore/dexfile v0.0.0-20251127160521-bf646b585160
+## explicit; go 1.23.4
+github.com/dexnore/dexfile
+github.com/dexnore/dexfile/client
+github.com/dexnore/dexfile/client/config
+github.com/dexnore/dexfile/client/resolver
+github.com/dexnore/dexfile/sbom
 # github.com/distribution/reference v0.6.0
 ## explicit; go 1.20
 github.com/distribution/reference
+# github.com/docker/go-units v0.5.0
+## explicit
+github.com/docker/go-units
 # github.com/felixge/httpsnoop v1.1.0
 ## explicit; go 1.25
 github.com/felixge/httpsnoop
@@ -82,17 +92,34 @@ github.com/klauspost/compress/internal/regmask
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
+# github.com/mitchellh/hashstructure/v2 v2.0.2
+## explicit; go 1.14
+github.com/mitchellh/hashstructure/v2
 # github.com/moby/buildkit v0.34.0
 ## explicit; go 1.26.8
+github.com/moby/buildkit/api/services/control
 github.com/moby/buildkit/api/types
 github.com/moby/buildkit/client/llb
 github.com/moby/buildkit/client/llb/sourceresolver
 github.com/moby/buildkit/errdefs
+github.com/moby/buildkit/executor/resources/types
+github.com/moby/buildkit/frontend/attestations
+github.com/moby/buildkit/frontend/attestations/sbom
+github.com/moby/buildkit/frontend/dockerfile/command
+github.com/moby/buildkit/frontend/dockerfile/linter
+github.com/moby/buildkit/frontend/dockerfile/parser
+github.com/moby/buildkit/frontend/dockerfile/shell
 github.com/moby/buildkit/frontend/gateway/client
 github.com/moby/buildkit/frontend/gateway/grpcclient
 github.com/moby/buildkit/frontend/gateway/pb
+github.com/moby/buildkit/frontend/subrequests
+github.com/moby/buildkit/frontend/subrequests/lint
+github.com/moby/buildkit/frontend/subrequests/outline
+github.com/moby/buildkit/frontend/subrequests/targets
 github.com/moby/buildkit/identity
 github.com/moby/buildkit/session
+github.com/moby/buildkit/solver/errdefs
+github.com/moby/buildkit/solver/llbsolver/provenance/types
 github.com/moby/buildkit/solver/pb
 github.com/moby/buildkit/solver/result
 github.com/moby/buildkit/source/types
@@ -116,6 +143,9 @@ github.com/moby/buildkit/util/stack
 github.com/moby/buildkit/util/system
 github.com/moby/buildkit/util/tracing
 github.com/moby/buildkit/version
+# github.com/moby/docker-image-spec v1.3.1
+## explicit; go 1.18
+github.com/moby/docker-image-spec/specs-go/v1
 # github.com/moby/locker v1.0.1
 ## explicit; go 1.13
 github.com/moby/locker
@@ -152,6 +182,9 @@ github.com/sirupsen/logrus/hooks/slog
 # github.com/tonistiigi/fsutil v0.0.0-20260819142231-83cac42c1c52
 ## explicit; go 1.25.0
 github.com/tonistiigi/fsutil/types
+# github.com/tonistiigi/go-csvvalue v0.0.0-20240814133006-030d3b2625d0
+## explicit; go 1.16
+github.com/tonistiigi/go-csvvalue
 # go.opentelemetry.io/auto/sdk v1.2.1
 ## explicit; go 1.24.0
 go.opentelemetry.io/auto/sdk
