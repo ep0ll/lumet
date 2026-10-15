@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"runtime"
 	"runtime/debug"
 
 	"github.com/dexnore/dexfile/client"
@@ -16,11 +17,29 @@ func Build(ctx context.Context, c gwclient.Client) (_ *gwclient.Result, err erro
 
 	if _, ok := clnt.BuildOpts().Opts["debug"]; ok {
 		defer func() {
-			if r := recover(); r != nil {
-				err = errors.Wrapf(err, "%+v", r)
+			r := recover()
+			if r == nil {
+				return
 			}
+
+			stack := debug.Stack()
+
+			var perr error
+			switch v := r.(type) {
+			case runtime.Error:
+				perr = errors.Errorf("runtime panic: %v", v)
+			case error:
+				perr = errors.Wrap(v, "panic")
+			default:
+				perr = errors.Errorf("panic: %v (type %T)", v, v)
+			}
+
+			perr = errors.Errorf("%v\n\ngoroutine stack:\n%s", perr, stack)
+
 			if err != nil {
-				err = errors.Wrapf(err, "%s", debug.Stack())
+				err = errors.Wrapf(err, "while handling earlier error, %v", perr)
+			} else {
+				err = perr
 			}
 		}()
 	}
