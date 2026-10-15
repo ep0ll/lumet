@@ -46,7 +46,16 @@ github.com/dexnore/dexfile
 github.com/dexnore/dexfile/client
 github.com/dexnore/dexfile/client/config
 github.com/dexnore/dexfile/client/resolver
+github.com/dexnore/dexfile/context
+github.com/dexnore/dexfile/context/buildcontext
+github.com/dexnore/dexfile/context/dexfile
+github.com/dexnore/dexfile/context/internal
+github.com/dexnore/dexfile/context/maincontext
+github.com/dexnore/dexfile/context/namedcontext
+github.com/dexnore/dexfile/context/namedcontext/internal
+github.com/dexnore/dexfile/localoutput
 github.com/dexnore/dexfile/sbom
+github.com/dexnore/dexfile/source
 # github.com/distribution/reference v0.6.0
 ## explicit; go 1.20
 github.com/distribution/reference
@@ -103,6 +112,8 @@ github.com/moby/buildkit/client/llb
 github.com/moby/buildkit/client/llb/sourceresolver
 github.com/moby/buildkit/errdefs
 github.com/moby/buildkit/executor/resources/types
+github.com/moby/buildkit/exporter/containerimage/exptypes
+github.com/moby/buildkit/exporter/exptypes
 github.com/moby/buildkit/frontend/attestations
 github.com/moby/buildkit/frontend/attestations/sbom
 github.com/moby/buildkit/frontend/dockerfile/command
@@ -149,6 +160,9 @@ github.com/moby/docker-image-spec/specs-go/v1
 # github.com/moby/locker v1.0.1
 ## explicit; go 1.13
 github.com/moby/locker
+# github.com/moby/patternmatcher v0.6.1
+## explicit; go 1.19
+github.com/moby/patternmatcher/ignorefile
 # github.com/moby/sys/signal v0.7.1
 ## explicit; go 1.17
 github.com/moby/sys/signal
