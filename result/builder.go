@@ -9,7 +9,7 @@ import (
 	"slices"
 
 	"github.com/containerd/platforms"
-	"github.com/ep0ll/lumet/frontend/client/config"
+	"github.com/ep0ll/lumet/frontend/config"
 	"github.com/moby/buildkit/exporter/containerimage/exptypes"
 	"github.com/moby/buildkit/frontend/gateway/client"
 	"github.com/moby/buildkit/solver/result"
