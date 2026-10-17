@@ -1,4 +1,4 @@
-package client
+package frontend
 
 import (
 	"github.com/moby/buildkit/solver/pb"

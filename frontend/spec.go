@@ -87,7 +87,7 @@ type Spec struct {
 // Dockerfile frontend’s context-loading code.
 func DefaultContextOptKeys() ContextOptKeys {
 	return ContextOptKeys{
-		Filename:             "filename",
+		Filename:             "Lumet",
 		ContextLocalName:     "contextkey",
 		DockerfileLocalNames: []string{"dockerfilekey"}, // add "lumetkey" (or any other aliases) if needed
 		ContextSubDir:        "contextsubdir",

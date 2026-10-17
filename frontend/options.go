@@ -1,6 +1,6 @@
-package client
+package frontend
 
-import "github.com/ep0ll/lumet/frontend/client/config"
+import "github.com/ep0ll/lumet/frontend/config"
 
 type settings struct {
 	parsers       []config.Parser

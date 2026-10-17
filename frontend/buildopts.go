@@ -1,18 +1,18 @@
-package client
+package frontend
 
 import (
 	"maps"
 	"slices"
 	"strings"
 
-	"github.com/moby/buildkit/frontend/gateway/client"
+	gwclient "github.com/moby/buildkit/frontend/gateway/client"
 	"github.com/moby/buildkit/util/apicaps"
 	"github.com/pkg/errors"
 )
 
 // cloneBuildOpts copies the mutable parts (Opts, Workers) so the Client can
 // edit its options without touching the gateway's originals.
-func cloneBuildOpts(src client.BuildOpts) client.BuildOpts {
+func cloneBuildOpts(src gwclient.BuildOpts) gwclient.BuildOpts {
 	dst := src
 	dst.Opts = maps.Clone(src.Opts)
 	if dst.Opts == nil {
@@ -23,14 +23,14 @@ func cloneBuildOpts(src client.BuildOpts) client.BuildOpts {
 }
 
 // SetOpt sets (or overwrites) a build option. Call InitConfig to re-parse.
-func (c *Client) SetOpt(key, value string) error {
+func (c *client) SetOpt(key, value string) error {
 	c.buildOpts.Opts[key] = value
 	return nil
 }
 
 // DelOpt deletes the given options; keys that were not set are reported
 // after all deletions have been applied.
-func (c *Client) DelOpt(keys ...string) error {
+func (c *client) DelOpt(keys ...string) error {
 	var missing []string
 	for i := 0; i < len(keys); i++ {
 		if _, ok := c.buildOpts.Opts[keys[i]]; !ok {
@@ -44,6 +44,6 @@ func (c *Client) DelOpt(keys ...string) error {
 	return nil
 }
 
-func (c *Client) WithSession(id string)   { c.buildOpts.SessionID = id }
-func (c *Client) Caps() apicaps.CapSet    { return c.buildOpts.Caps }
-func (c *Client) LLBCaps() apicaps.CapSet { return c.buildOpts.LLBCaps }
+func (c *client) WithSession(id string)   { c.buildOpts.SessionID = id }
+func (c *client) Caps() apicaps.CapSet    { return c.buildOpts.Caps }
+func (c *client) LLBCaps() apicaps.CapSet { return c.buildOpts.LLBCaps }
