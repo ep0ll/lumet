@@ -43,7 +43,24 @@ func TestCanonicalRejectsEmptyName(t *testing.T) {
 	}
 }
 
-func TestQualifiedNormalizesPlatform(t *testing.T) {
+func TestResolveRejectsNilClient(t *testing.T) {
+	if _, err := Resolve("alpine", nil, ContextOpt{}); err == nil {
+		t.Fatal("Resolve with nil client succeeded, want error")
+	}
+}
+
+func TestResolveBaseRejectsNilClientAndEmptyName(t *testing.T) {
+	if _, err := ResolveBase("alpine", nil, ContextOpt{}); err == nil {
+		t.Fatal("ResolveBase with nil client succeeded, want error")
+	}
+	for _, input := range []string{"", " "} {
+		if _, err := ResolveBase(input, nil, ContextOpt{}); err == nil {
+			t.Errorf("ResolveBase(%q) succeeded, want error", input)
+		}
+	}
+}
+
+func TestQualifiedNormalizesPlatform(t *t) {
 	t.Parallel()
 
 	platform := &ocispecs.Platform{OS: "linux", Architecture: "amd64"}
