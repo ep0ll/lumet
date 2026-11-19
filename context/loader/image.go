@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/distribution/reference"
+	"github.com/ep0ll/lumet/frontend"
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/client/llb/sourceresolver"
 	"github.com/moby/buildkit/util/imageutil"
@@ -18,7 +19,7 @@ import (
 func loadImage(ctx context.Context, ref string, req Request) (*llb.State, *dockerspec.DockerOCIImage, error) {
 	ref = strings.TrimPrefix(ref, "//")
 
-	if ref == dexfile.EmptyImageName {
+	if ref == EmptyImageName {
 		st := llb.Scratch()
 		return &st, nil, nil
 	}
@@ -52,7 +53,7 @@ func redirectIfNonImage(err error, req Request) (*llb.State, *dockerspec.DockerO
 	}
 
 	newInput := before + ":" + after
-	req.Client.SetOpt("context:"+req.NameWithPlatform, newInput)
+	req.Client = frontend.SetOpt(req.Client, "context:"+req.NameWithPlatform, newInput)
 
 	if req.Retry == nil {
 		return nil, nil, errors.New("retry callback required")

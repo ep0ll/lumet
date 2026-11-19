@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -47,3 +48,39 @@ func (c *client) DelOpt(keys ...string) error {
 func (c *client) WithSession(id string)   { c.buildOpts.SessionID = id }
 func (c *client) Caps() apicaps.CapSet    { return c.buildOpts.Caps }
 func (c *client) LLBCaps() apicaps.CapSet { return c.buildOpts.LLBCaps }
+
+// SetOpt returns a new Client that contains the given key/value pair.
+// The original client is never mutated.
+func SetOpt(c Client, key, value string) Client {
+	cl := mustClone(c)
+	if cl.buildOpts.Opts == nil {
+		cl.buildOpts.Opts = make(map[string]string)
+	}
+	cl.buildOpts.Opts[key] = value
+	return cl
+}
+
+// DelOpt returns a new Client with the given keys removed.
+// Missing keys are reported after all deletions have been applied.
+func DelOpt(c Client, keys ...string) (Client, error) {
+	cl := mustClone(c)
+	var missing []string
+	for _, k := range keys {
+		if _, ok := cl.buildOpts.Opts[k]; !ok {
+			missing = append(missing, k)
+		}
+		delete(cl.buildOpts.Opts, k)
+	}
+	if len(missing) > 0 {
+		return cl, fmt.Errorf("build options not set: %v", missing)
+	}
+	return cl, nil
+}
+
+func mustClone(c Client) *client {
+	if cl, ok := c.(*client); ok {
+		return cl.Clone().(*client)
+	}
+	// Should never happen with the constructors in this package.
+	panic("frontend: unexpected Client implementation")
+}

@@ -3,7 +3,9 @@ package context
 import (
 	"context"
 
+	"github.com/ep0ll/lumet/context/loader"
 	"github.com/ep0ll/lumet/context/lumet"
+	"github.com/ep0ll/lumet/context/namedcontext"
 	"github.com/ep0ll/lumet/frontend"
 
 	"github.com/moby/buildkit/client/llb"
@@ -48,7 +50,7 @@ func (b *buildContext) MainContext(ctx context.Context, opts ...llb.LocalOption)
 }
 
 // NamedContext implements BuildClient.
-func (b *buildContext) NamedContext(name string, opt ContextOpt) (NamedContext, error) {
+func (b *buildContext) NamedContext(name string, opt loader.ContextOpt) (namedcontext.NamedContext, error) {
 	spec, err := b.g.Do(context.Background(), "named", func(ctx context.Context) (BuildSpec, error) {
 		return BuildSpec{}, nil
 	})

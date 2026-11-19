@@ -1,13 +1,14 @@
 package namedcontext
 
 import (
+	"github.com/ep0ll/lumet/context/loader"
 	"github.com/ep0ll/lumet/frontend"
 	"github.com/pkg/errors"
 )
 
 // Resolve looks up a previously registered context key
 // ("context:<name>" or "context:<name>::<platform>").
-func Resolve(name string, client frontend.Client, opt ContextOpt) (NamedContext, error) {
+func Resolve(name string, client frontend.Client, opt loader.ContextOpt) (NamedContext, error) {
 	canonical, err := Canonical(name)
 	if err != nil {
 		return nil, err
@@ -26,7 +27,7 @@ func Resolve(name string, client frontend.Client, opt ContextOpt) (NamedContext,
 
 // ResolveBase creates a source whose input is the name itself
 // (base-image style contexts).
-func ResolveBase(name string, client frontend.Client, opt ContextOpt) (NamedContext, error) {
+func ResolveBase(name string, client frontend.Client, opt loader.ContextOpt) (NamedContext, error) {
 	if c, err := Canonical(name); err == nil {
 		name = c
 	}
@@ -42,7 +43,7 @@ func ResolveBase(name string, client frontend.Client, opt ContextOpt) (NamedCont
 	return nil, errors.Errorf("invalid context name [%s]", name)
 }
 
-func fromKey(name, key string, client frontend.Client, opt ContextOpt) *Source {
+func fromKey(name, key string, client frontend.Client, opt loader.ContextOpt) *Source {
 	v, ok := client.BuildOpts().Opts["context:"+key]
 	if !ok {
 		return nil
@@ -50,11 +51,11 @@ func fromKey(name, key string, client frontend.Client, opt ContextOpt) *Source {
 	return newSource(v, name, key, client, opt)
 }
 
-func fromLiteral(name, key string, client frontend.Client, opt ContextOpt) *Source {
+func fromLiteral(name, key string, client frontend.Client, opt loader.ContextOpt) *Source {
 	return newSource(name, name, key, client, opt)
 }
 
-func newSource(input, name, nameWithPlatform string, client frontend.Client, opt ContextOpt) *Source {
+func newSource(input, name, nameWithPlatform string, client frontend.Client, opt loader.ContextOpt) *Source {
 	return &Source{
 		input:            input,
 		name:             name,

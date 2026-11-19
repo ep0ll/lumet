@@ -18,7 +18,7 @@ type Source struct {
 	name             string
 	nameWithPlatform string
 	client           frontend.Client
-	opt              ContextOpt
+	opt              loader.ContextOpt
 }
 
 func (s *Source) Load(ctx context.Context) (*llb.State, *dockerspec.DockerOCIImage, error) {

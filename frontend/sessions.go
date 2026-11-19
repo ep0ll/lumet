@@ -22,3 +22,18 @@ func ParseLocalSessions(opts map[string]string) LocalSessions {
 }
 
 func (s LocalSessions) clone() LocalSessions { return maps.Clone(s) }
+
+// GetLocalSession returns the session ID registered for the named local
+// context. When no explicit session is registered it falls back to the
+// build's own session ID and reports found == false.
+func GetLocalSession(c Client, name string) (session string, found bool) {
+	cl, ok := c.(*client)
+	if !ok {
+		// fall back to the gateway session for any other implementation
+		return c.BuildOpts().SessionID, false
+	}
+	if id, ok := cl.sessions[name]; ok {
+		return id, true
+	}
+	return cl.buildOpts.SessionID, false
+}
