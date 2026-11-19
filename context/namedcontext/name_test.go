@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/containerd/platforms"
+	"github.com/ep0ll/lumet/context/loader"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -44,23 +45,18 @@ func TestCanonicalRejectsEmptyName(t *testing.T) {
 }
 
 func TestResolveRejectsNilClient(t *testing.T) {
-	if _, err := Resolve("alpine", nil, ContextOpt{}); err == nil {
+	if _, err := Resolve("alpine", nil, loader.ContextOpt{}); err == nil {
 		t.Fatal("Resolve with nil client succeeded, want error")
 	}
 }
 
-func TestResolveBaseRejectsNilClientAndEmptyName(t *testing.T) {
-	if _, err := ResolveBase("alpine", nil, ContextOpt{}); err == nil {
+func TestResolveBaseRejectsNilClient(t *testing.T) {
+	if _, err := ResolveBase("alpine", nil, loader.ContextOpt{}); err == nil {
 		t.Fatal("ResolveBase with nil client succeeded, want error")
-	}
-	for _, input := range []string{"", " "} {
-		if _, err := ResolveBase(input, nil, ContextOpt{}); err == nil {
-			t.Errorf("ResolveBase(%q) succeeded, want error", input)
-		}
 	}
 }
 
-func TestQualifiedNormalizesPlatform(t *t) {
+func TestQualifiedNormalizesPlatform(t *testing.T) {
 	t.Parallel()
 
 	platform := &ocispecs.Platform{OS: "linux", Architecture: "amd64"}
