@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 
+	"github.com/ep0ll/lumet/context/llbutil"
 	"github.com/ep0ll/lumet/context/localoutput"
 	"github.com/ep0ll/lumet/frontend"
 	"github.com/moby/buildkit/client/llb"
@@ -22,11 +23,12 @@ func loadLocal(ctx context.Context, name string, req Request) (*llb.State, *dock
 	}
 
 	st := llb.NewState(&localoutput.AsyncOutput{
-		Name:             name,
+		Name: name,
 		NameWithPlatform: req.NameWithPlatform,
-		SessionID:        sessionID,
-		Excludes:         excludes,
-		Extra:           req.Opt.AsyncLocalOpts,
+		SessionID: sessionID,
+		SharedKey: req.Opt.SharedKey,
+		Excludes: excludes,
+		Extra: req.Opt.AsyncLocalOpts,
 	})
 	return &st, nil, nil
 }
@@ -43,24 +45,29 @@ func readIgnoreFile(ctx context.Context, name, sessionID string, req Request) ([
 		llb.WithCustomName(label(req.NameWithPlatform, "load "+DefaultIgnoreName)),
 		llb.Differ(llb.DiffNone, false),
 	)
-
-	def, err := probe.Marshal(ctx)
+	def, err := probe.Marshal(ctx, llb.WithCaps(req.Client.BuildOpts().Caps))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "marshal local ignore-file probe")
 	}
 	res, err := req.Client.Solve(ctx, gwclient.SolveRequest{
-		Evaluate:   true,
+		Evaluate: true,
 		Definition: def.ToPB(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "solve local ignore-file probe")
 	}
 	ref, err := res.SingleRef()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "resolve local ignore-file probe")
 	}
 
-	dt, _ := ref.ReadFile(ctx, gwclient.ReadRequest{Filename: DefaultIgnoreName})
+	dt, err := llbutil.ReadFile(ctx, ref, DefaultIgnoreName)
+	if err != nil {
+		if llbutil.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, errors.Wrapf(err, "read %s", DefaultIgnoreName)
+	}
 	if len(dt) == 0 {
 		return nil, nil
 	}

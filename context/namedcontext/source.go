@@ -26,17 +26,17 @@ func (s *Source) Load(ctx context.Context) (*llb.State, *dockerspec.DockerOCIIma
 }
 
 func (s *Source) load(ctx context.Context, depth int) (*llb.State, *dockerspec.DockerOCIImage, error) {
-	if depth > maxDepth {
-		return nil, nil, errors.Errorf("context recursion limit exceeded (possible cycle): %s", s.input)
+	if depth >= maxDepth {
+		return nil, nil, errors.Errorf("context recursion limit (%d) exceeded; possible source-policy cycle: %s", maxDepth, s.input)
 	}
 
 	return loader.Load(ctx, loader.Request{
-		Input:            s.input,
-		Name:             s.name,
+		Input: s.input,
+		Name: s.name,
 		NameWithPlatform: s.nameWithPlatform,
-		Client:           s.client,
-		Opt:              s.opt,
-		Depth:            depth,
+		Client: s.client,
+		Opt: s.opt,
+		Depth: depth,
 		Retry: func(newInput string) (*llb.State, *dockerspec.DockerOCIImage, error) {
 			next := *s
 			next.input = newInput
