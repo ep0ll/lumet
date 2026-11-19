@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 
+	"github.com/ep0ll/lumet/context/llbutil"
 	"github.com/ep0ll/lumet/context/localoutput"
 	"github.com/ep0ll/lumet/frontend"
 	"github.com/moby/buildkit/client/llb"
@@ -25,6 +26,7 @@ func loadLocal(ctx context.Context, name string, req Request) (*llb.State, *dock
 		Name:             name,
 		NameWithPlatform: req.NameWithPlatform,
 		SessionID:        sessionID,
+		SharedKey: req.Opt.SharedKey,
 		Excludes:         excludes,
 		Extra:           req.Opt.AsyncLocalOpts,
 	})
@@ -60,7 +62,13 @@ func readIgnoreFile(ctx context.Context, name, sessionID string, req Request) ([
 		return nil, err
 	}
 
-	dt, _ := ref.ReadFile(ctx, gwclient.ReadRequest{Filename: DefaultIgnoreName})
+	dt, _ := llbutil.ReadFile(ctx, ref, DefaultIgnoreName)
+	// if err != nil {
+	// 	if llbutil.IsNotFound(err) {
+	// 		return nil, nil
+	// 	}
+	// 	return nil, errors.Wrapf(err, "read %s", DefaultIgnoreName)
+	// }
 	if len(dt) == 0 {
 		return nil, nil
 	}

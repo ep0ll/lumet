@@ -9,8 +9,12 @@ import (
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// Canonical returns the normalised context name (strips conventional ":latest").
+// Canonical normalises a context name and removes the conventional :latest tag.
 func Canonical(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", errors.New("context name cannot be empty")
+	}
 	named, err := reference.ParseNormalizedNamed(raw)
 	if err != nil {
 		return "", errors.Wrapf(err, "invalid context name %q", raw)

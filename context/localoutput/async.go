@@ -16,6 +16,7 @@ type AsyncOutput struct {
 	SessionID        string
 	Excludes         []string
 	Extra            func() []llb.LocalOption
+	SharedKey        string
 
 	output llb.Output
 	once   sync.Once
@@ -32,10 +33,14 @@ func (a *AsyncOutput) Vertex(ctx context.Context, c *llb.Constraints) llb.Vertex
 }
 
 func (a *AsyncOutput) materialise() {
+	sharedKey := "context:" + a.NameWithPlatform
+	if a.SharedKey != "" {
+		sharedKey += "-" + a.SharedKey
+	}
 	opts := []llb.LocalOption{
 		llb.WithCustomName("[context " + a.NameWithPlatform + "] load from client"),
 		llb.SessionID(a.SessionID),
-		llb.SharedKeyHint("context:" + a.NameWithPlatform),
+		llb.SharedKeyHint(sharedKey),
 		llb.ExcludePatterns(a.Excludes),
 	}
 	if a.Extra != nil {

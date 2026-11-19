@@ -12,4 +12,5 @@ type ContextOpt struct {
 	Platform       *ocispecs.Platform
 	ResolveMode    string
 	CaptureDigest  *digest.Digest
+	SharedKey string
 }
