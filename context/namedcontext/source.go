@@ -22,18 +22,9 @@ type Source struct {
 }
 
 func (s *Source) Load(ctx context.Context) (*llb.State, *dockerspec.DockerOCIImage, error) {
-	if s == nil {
-		return nil, nil, errors.New("named context source is nil")
-	}
-	if s.client == nil {
-		return nil, nil, errors.New("named context source has no frontend client")
-	}
 	// Each load owns an independent frontend client view. The gateway connection
 	// and resolve cache remain shared while BuildOpts mutation stays isolated.
 	client := s.client.Clone()
-	if client == nil {
-		return nil, nil, errors.New("failed to clone frontend client for named context")
-	}
 	return s.load(ctx, 0, client)
 }
 

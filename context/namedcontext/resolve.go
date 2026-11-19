@@ -9,16 +9,13 @@ import (
 )
 
 const (
-	contextPrefix = "context:"
+	contextPrefix   = "context:"
 	sharedKeyPrefix = "sharedkey:localdir:"
 )
 
 // Resolve looks up a previously registered context key, preferring the
 // platform-qualified option and falling back to the unqualified option.
 func Resolve(name string, client frontend.Client, opt loader.ContextOpt) (NamedContext, error) {
-	if client == nil {
-		return nil, errors.New("cannot resolve a named context without a frontend client")
-	}
 	canonical, err := Canonical(name)
 	if err != nil {
 		return nil, err
@@ -37,9 +34,6 @@ func Resolve(name string, client frontend.Client, opt loader.ContextOpt) (NamedC
 // ResolveBase creates a source whose input is the name itself
 // (base-image style contexts).
 func ResolveBase(name string, client frontend.Client, opt loader.ContextOpt) (NamedContext, error) {
-	if client == nil {
-		return nil, errors.New("cannot resolve a base context without a frontend client")
-	}
 	if strings.TrimSpace(name) == "" {
 		return nil, errors.New("base context name cannot be empty")
 	}
