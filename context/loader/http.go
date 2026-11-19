@@ -10,16 +10,23 @@ import (
 )
 
 func loadHTTP(ctx context.Context, fullURL string, req Request) (*llb.State, *dockerspec.DockerOCIImage, error) {
-	// Prefer git semantics when possible.
-	True := true
-	st, _, err := dockerui.DetectGitContext(req.Input, &True)
-	if err == nil {
-		return st, nil, nil
+	// Some HTTPS URLs are Git remotes. Preserve BuildKit's Git interpretation
+	// before falling back to a plain HTTP source.
+	keepGit := true
+	state, isGit, gitErr := dockerui.DetectGitContext(fullURL, &keepGit)
+	if isGit {
+		if gitErr != nil {
+			return nil, nil, fmt.Errorf("invalid git context %q: %w", fullURL, gitErr)
+		}
+		return state, nil, nil
 	}
 
-	st, _, ok := dockerui.DetectHTTPContext(req.Input)
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid http context %s", req.Input)
+	state, _, ok := dockerui.DetectHTTPContext(fullURL)
+	if !ok || state == nil {
+		if gitErr != nil {
+			return nil, nil, fmt.Errorf("invalid HTTP context %q: %w", fullURL, gitErr)
+		}
+		return nil, nil, fmt.Errorf("invalid HTTP context %q", fullURL)
 	}
-	return st, nil, nil
+	return state, nil, nil
 }

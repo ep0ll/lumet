@@ -12,7 +12,7 @@ import (
 
 const maxDepth = 10
 
-// Source implements dexfile.NamedContext.
+// Source resolves a registered context lazily.
 type Source struct {
 	input            string
 	name             string
@@ -22,10 +22,23 @@ type Source struct {
 }
 
 func (s *Source) Load(ctx context.Context) (*llb.State, *dockerspec.DockerOCIImage, error) {
-	return s.load(ctx, 0)
+	if s == nil {
+		return nil, nil, errors.New("named context source is nil")
+	}
+	if s.client == nil {
+		return nil, nil, errors.New("named context source has no frontend client")
+	}
+
+	// SetOpt mutates BuildOpts. Use an independent client view for each load
+	// so concurrent named-context loads cannot race while following redirects.
+	client := s.client.Clone()
+	if client == nil {
+		return nil, nil, errors.New("failed to clone frontend client for named context")
+	}
+	return s.load(ctx, 0, client)
 }
 
-func (s *Source) load(ctx context.Context, depth int) (*llb.State, *dockerspec.DockerOCIImage, error) {
+func (s *Source) load(ctx context.Context, depth int, client frontend.Client) (*llb.State, *dockerspec.DockerOCIImage, error) {
 	if depth > maxDepth {
 		return nil, nil, errors.Errorf("context recursion limit exceeded (possible cycle): %s", s.input)
 	}
@@ -34,13 +47,13 @@ func (s *Source) load(ctx context.Context, depth int) (*llb.State, *dockerspec.D
 		Input:            s.input,
 		Name:             s.name,
 		NameWithPlatform: s.nameWithPlatform,
-		Client:           s.client,
+		Client:           client,
 		Opt:              s.opt,
 		Depth:            depth,
 		Retry: func(newInput string) (*llb.State, *dockerspec.DockerOCIImage, error) {
 			next := *s
 			next.input = newInput
-			return next.load(ctx, depth+1)
+			return next.load(ctx, depth+1, client)
 		},
 	})
 }

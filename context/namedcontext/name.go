@@ -9,20 +9,23 @@ import (
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// Canonical returns the normalised context name (strips conventional ":latest").
+// Canonical normalises a context name and removes the conventional :latest tag.
 func Canonical(raw string) (string, error) {
-	named, err := reference.ParseNormalizedNamed(raw)
+	if strings.TrimSpace(raw) == "" {
+		return "", errors.New("context name cannot be empty")
+	}
+	named, err := reference.ParseNormalizedNamed(strings.TrimSpace(raw))
 	if err != nil {
 		return "", errors.Wrapf(err, "invalid context name %q", raw)
 	}
 	return strings.TrimSuffix(reference.FamiliarString(named), ":latest"), nil
 }
 
-// Qualified returns the platform-qualified key "name::os/arch[/variant]".
-func Qualified(name string, p *ocispecs.Platform) string {
+// Qualified returns the platform-qualified key name::os/arch[/variant].
+func Qualified(name string, platform *ocispecs.Platform) string {
 	spec := platforms.DefaultSpec()
-	if p != nil {
-		spec = *p
+	if platform != nil {
+		spec = *platform
 	}
 	return name + "::" + platforms.FormatAll(platforms.Normalize(spec))
 }

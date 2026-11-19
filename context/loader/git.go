@@ -9,10 +9,13 @@ import (
 )
 
 func loadGit(req Request) (*llb.State, *dockerspec.DockerOCIImage, error) {
-	True := true
-	st, _, err := dockerui.DetectGitContext(req.Input, &True)
+	keepGit := true
+	state, isGit, err := dockerui.DetectGitContext(req.Input, &keepGit)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid git context %s: %w", req.Input, err)
+		return nil, nil, fmt.Errorf("invalid git context %q: %w", req.Input, err)
 	}
-	return st, nil, nil
+	if !isGit || state == nil {
+		return nil, nil, fmt.Errorf("invalid git context %q", req.Input)
+	}
+	return state, nil, nil
 }

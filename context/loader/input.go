@@ -14,36 +14,35 @@ import (
 func loadInput(ctx context.Context, inputRef string, req Request) (*llb.State, *dockerspec.DockerOCIImage, error) {
 	inputs, err := req.Client.Inputs(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "failed to load frontend inputs")
 	}
-	st, ok := inputs[inputRef]
+	state, ok := inputs[inputRef]
 	if !ok {
 		return nil, nil, errors.Errorf("invalid input %q for %s", inputRef, req.NameWithPlatform)
 	}
 
 	raw, ok := req.Client.BuildOpts().Opts["input-metadata:"+inputRef]
-	if !ok {
-		return &st, nil, nil
+	if !ok || raw == "" {
+		return &state, nil, nil
 	}
 
-	meta := make(map[string][]byte)
-	if err := json.Unmarshal([]byte(raw), &meta); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to parse input metadata")
+	metadata := make(map[string][]byte)
+	if err := json.Unmarshal([]byte(raw), &metadata); err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to parse metadata for input %q", inputRef)
 	}
 
-	cfg, ok := meta[exptypes.ExporterImageConfigKey]
-	if !ok {
-		return &st, nil, nil
-	}
-
-	st, err = st.WithImageConfig(cfg)
-	if err != nil {
-		return nil, nil, err
+	cfg, ok := metadata[exptypes.ExporterImageConfigKey]
+	if !ok || len(cfg) == 0 {
+		return &state, nil, nil
 	}
 
 	var img dockerspec.DockerOCIImage
 	if err := json.Unmarshal(cfg, &img); err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to parse image config for %s", req.NameWithPlatform)
 	}
-	return &st, &img, nil
+	state, err = state.WithImageConfig(cfg)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to attach image config for %s", req.NameWithPlatform)
+	}
+	return &state, &img, nil
 }
