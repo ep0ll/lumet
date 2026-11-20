@@ -220,16 +220,16 @@ func (b *buildContext) BuildDefinition(ctx context.Context, opts ...llb.LocalOpt
 		)
 	}
 
-	definition, err := state.Marshal(ctx, llbutil.MarshalOpts(b.client.BuildOpts())...)
+	llbDef, err := state.Marshal(ctx, llbutil.MarshalOpts(b.client.BuildOpts())...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal build definition source: %w", err)
 	}
-	vertex, err := definition.Head()
+	vertex, err := llbDef.Head()
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve build definition vertex: %w", err)
 	}
 
-	result, err := b.client.Solve(ctx, gwclient.SolveRequest{Definition: definition.ToPB()})
+	result, err := b.client.Solve(ctx, gwclient.SolveRequest{Definition: llbDef.ToPB()})
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve build definition: %w", err)
 	}
@@ -244,7 +244,7 @@ func (b *buildContext) BuildDefinition(ctx context.Context, opts ...llb.LocalOpt
 	}
 
 	sourceMap := llb.NewSourceMap(state, bctx.filename, b.spec.Name, data)
-	sourceMap.Definition = definition
+	sourceMap.Definition = llbDef
 
 	warn := func(ctx context.Context, message string, opt gwclient.WarnOpts) {
 		if opt.Level == 0 {
