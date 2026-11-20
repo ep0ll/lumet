@@ -8,6 +8,7 @@ import (
 
 	"github.com/ep0ll/lumet/context/llbutil"
 	"github.com/ep0ll/lumet/context/source"
+	"github.com/ep0ll/lumet/context/optionutil"
 	"github.com/ep0ll/lumet/frontend"
 )
 
@@ -74,11 +75,7 @@ func WithParser(parser Parser) Option {
 // Apply builds an independent Options value.
 func Apply(options ...Option) Options {
 	var opts Options
-	for _, option := range options {
-		if option != nil {
-			option(&opts)
-		}
-	}
+	optionutil.Apply(&opts, options)
 	opts.Options = opts.Options.Clone()
 	opts.Files = slices.Clone(opts.Files)
 	return opts

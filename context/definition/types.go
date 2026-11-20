@@ -8,6 +8,7 @@ import (
 
 	"github.com/ep0ll/lumet/context/ignore"
 	"github.com/ep0ll/lumet/context/source"
+	"github.com/ep0ll/lumet/context/optionutil"
 	"github.com/ep0ll/lumet/frontend"
 	"github.com/moby/buildkit/client/llb"
 	gwclient "github.com/moby/buildkit/frontend/gateway/client"
@@ -97,11 +98,7 @@ func WithParser(parser Parser) Option {
 // Apply builds independent options from option functions.
 func Apply(options ...Option) Options {
 	var opts Options
-	for _, option := range options {
-		if option != nil {
-			option(&opts)
-		}
-	}
+	optionutil.Apply(&opts, options)
 	opts.Options = opts.Options.Clone()
 	opts.Fallbacks = slices.Clone(opts.Fallbacks)
 	opts.IgnoreFiles = slices.Clone(opts.IgnoreFiles)

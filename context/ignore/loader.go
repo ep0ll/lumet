@@ -31,7 +31,7 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 	if len(files) == 0 && opts.Source.Kind == source.KindLocal {
 		files = []string{".dockerignore"}
 	}
-	files, err := cleanPaths(files)
+	files, err := source.CleanPaths(files)
 	if err != nil {
 		return nil, fmt.Errorf("ignore-file paths: %w", err)
 	}
@@ -40,25 +40,20 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 	if resolver == nil {
 		resolver = l.Resolver
 	}
-	if resolver == nil {
-		resolver = source.DefaultResolver()
-	}
-
 	followPaths := append(append([]string(nil), opts.FollowPaths...), files...)
-	followPaths, err = cleanPaths(followPaths)
+	followPaths, err = source.CleanPaths(followPaths)
 	if err != nil {
 		return nil, fmt.Errorf("ignore source follow paths: %w", err)
 	}
-
 	resolveOptions := opts.Options.Clone()
 	resolveOptions.FollowPaths = followPaths
 	resolveOptions.ExcludePatterns = nil
-	resolved, err := resolver.Resolve(ctx, client, opts.Source, resolveOptions)
+	resolved, err := source.Resolve(ctx, client, resolver, opts.Source, resolveOptions)
 	if err != nil {
 		return nil, fmt.Errorf("resolve ignore-file source: %w", err)
 	}
 	if len(files) == 0 && resolved.Filename != "" {
-		files, err = cleanPaths([]string{resolved.Filename})
+		files, err = source.CleanPaths([]string{resolved.Filename})
 		if err != nil {
 			return nil, fmt.Errorf("resolved ignore-file path: %w", err)
 		}
@@ -81,28 +76,21 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 // ReadPatterns reads and parses the first existing ignore file. Missing
 // candidates are optional; other read and parse failures are returned.
 func ReadPatterns(ctx context.Context, solved *source.Solved, files []string, parser Parser) ([]string, string, error) {
-	for _, filename := range files {
-		data, err := solved.ReadFile(ctx, filename)
-		if llbutil.IsNotFound(err) {
-			continue
-		}
-		if err != nil {
-			return nil, "", fmt.Errorf("read ignore file %q: %w", filename, err)
-		}
-		patterns, err := Parse(parser, filename, data)
-		if err != nil {
-			return nil, "", fmt.Errorf("parse ignore file %q: %w", filename, err)
-		}
-		return patterns, filename, nil
+	data, filename, err := source.ReadFirstFile(ctx, solved, files)
+	if llbutil.IsNotFound(err) {
+		return nil, "", nil
 	}
-	return nil, "", nil
+	if err != nil {
+		return nil, "", fmt.Errorf("read ignore files: %w", err)
+	}
+	patterns, err := Parse(parser, filename, data)
+	if err != nil {
+		return nil, "", fmt.Errorf("parse ignore file %q: %w", filename, err)
+	}
+	return patterns, filename, nil
 }
 
 // Parse parses an ignore file with the supplied parser or Moby's default.
 func Parse(parser Parser, filename string, data []byte) ([]string, error) {
 	return llbutil.ParseIgnoreFile(parser, filename, data)
-}
-
-func cleanPaths(paths []string) ([]string, error) {
-	return llbutil.CleanRelativePaths(paths)
 }

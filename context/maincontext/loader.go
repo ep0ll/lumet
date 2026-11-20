@@ -35,9 +35,6 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 	if resolver == nil {
 		resolver = l.Resolver
 	}
-	if resolver == nil {
-		resolver = source.DefaultResolver()
-	}
 
 	excludes := append([]string(nil), opts.ExcludePatterns...)
 	if opts.ApplyIgnorePatterns {
@@ -54,7 +51,7 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 	if spec.Kind == source.KindLocal {
 		resolveOptions.ExcludePatterns = excludes
 	}
-	resolved, err := resolver.Resolve(ctx, client, spec, resolveOptions)
+	resolved, err := source.Resolve(ctx, client, resolver, spec, resolveOptions)
 	if err != nil {
 		return nil, fmt.Errorf("resolve main context: %w", err)
 	}
