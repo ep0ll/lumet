@@ -14,20 +14,20 @@ const (
 )
 
 // Resolve looks up a previously registered context key
-// ("context:<name>" or "context:<name>::<platform>").
+// (context:name or context:name::platform).
 func Resolve(name string, client frontend.Client, opt loader.ContextOpt) (NamedContext, error) {
+	opt = opt.Clone()
 	canonical, err := Canonical(name)
 	if err != nil {
 		return nil, err
 	}
 
 	qualified := Qualified(canonical, opt.Platform)
-
-	if s := fromKey(canonical, qualified, client, opt); s != nil {
-		return s, nil
+	if source := fromKey(canonical, qualified, client, opt); source != nil {
+		return source, nil
 	}
-	if s := fromKey(canonical, canonical, client, opt); s != nil {
-		return s, nil
+	if source := fromKey(canonical, canonical, client, opt); source != nil {
+		return source, nil
 	}
 	return nil, errors.Errorf("invalid context name %q", name)
 }
@@ -35,21 +35,21 @@ func Resolve(name string, client frontend.Client, opt loader.ContextOpt) (NamedC
 // ResolveBase creates a source whose input is the name itself
 // (base-image style contexts).
 func ResolveBase(name string, client frontend.Client, opt loader.ContextOpt) (NamedContext, error) {
+	opt = opt.Clone()
 	if strings.TrimSpace(name) == "" {
 		return nil, errors.New("base context name cannot be empty")
 	}
 	name = strings.TrimSpace(name)
-	if c, err := Canonical(name); err == nil {
-		name = c
+	if canonical, err := Canonical(name); err == nil {
+		name = canonical
 	}
 
 	qualified := Qualified(name, opt.Platform)
-
-	if s := fromLiteral(name, qualified, client, opt); s != nil {
-		return s, nil
+	if source := fromLiteral(name, qualified, client, opt); source != nil {
+		return source, nil
 	}
-	if s := fromLiteral(name, name, client, opt); s != nil {
-		return s, nil
+	if source := fromLiteral(name, name, client, opt); source != nil {
+		return source, nil
 	}
 	return nil, errors.Errorf("invalid context name [%s]", name)
 }
@@ -79,6 +79,6 @@ func newSource(input, name, nameWithPlatform string, client frontend.Client, opt
 		name:             name,
 		nameWithPlatform: nameWithPlatform,
 		client:           client,
-		opt:              opt,
+		opt:              opt.Clone(),
 	}
 }

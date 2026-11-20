@@ -2,57 +2,107 @@ package context
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/ep0ll/lumet/context/loader"
-	"github.com/ep0ll/lumet/context/lumet"
-	"github.com/ep0ll/lumet/context/namedcontext"
 	"github.com/ep0ll/lumet/frontend"
-
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/util/flightcontrol"
-	"github.com/pkg/errors"
 )
 
-type buildContext struct {
-	g      flightcontrol.CachedGroup[BuildSpec]
-	spec   frontend.Spec
-	client frontend.Client
+// SourceResolver translates a source identifier into an LLB state. Returning
+// a nil ResolvedSource means that the identifier should be treated as a local
+// BuildKit session name. Implementations can add frontend-specific transports
+// without changing the context orchestration code.
+type SourceResolver interface {
+	Resolve(context.Context, string, ResolveOptions, frontend.Client) (*ResolvedSource, error)
 }
 
-func New(spec frontend.Spec, client frontend.Client) BuildClient {
-	return &buildContext{
-		spec:   spec,
-		client: client,
+// ResolveOptions carries source-resolution policy shared by the default and
+// custom source resolvers.
+type ResolveOptions struct {
+	KeepGitDir bool
+}
+
+// ResolvedSource is a non-local source returned by a SourceResolver.
+type ResolvedSource struct {
+	State    *llb.State
+	Filename string
+}
+
+// Option configures the context client.
+type Option func(*options)
+
+type options struct {
+	resolver SourceResolver
+}
+
+// WithSourceResolver replaces the built-in Git/HTTP source resolver.
+func WithSourceResolver(resolver SourceResolver) Option {
+	return func(o *options) {
+		o.resolver = resolver
 	}
 }
 
-// BuildDefinition implements BuildClient.
-func (b *buildContext) BuildDefinition(ctx context.Context, opts ...llb.LocalOption) (lumet.Source, error) {
-	spec, err := b.g.Do(ctx, "build", func(ctx context.Context) (BuildSpec, error) {
-		source, err := lumet.BuildDefinition()
-		if err != nil {
-			err = errors.Wrap(err, "failed to load build definition")
+type buildContext struct {
+	group    flightcontrol.CachedGroup[*buildContextState]
+	spec     frontend.Spec
+	client   frontend.Client
+	resolver SourceResolver
+	initErr  error
+}
+
+// New creates a context client using the default BuildKit Git/HTTP resolver.
+func New(spec frontend.Spec, client frontend.Client) BuildClient {
+	return NewWithOptions(spec, client)
+}
+
+// NewWithOptions creates a context client with an optional source resolver.
+// The specification is cloned and validated so callers can safely reuse it.
+func NewWithOptions(spec frontend.Spec, client frontend.Client, opts ...Option) BuildClient {
+	spec = spec.Clone()
+	err := spec.Validate()
+	if client == nil && err == nil {
+		err = fmt.Errorf("frontend client is nil")
+	}
+
+	var configured options
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&configured)
 		}
-		
-		return BuildSpec{
-			Source: source,
-		}, err
-	})
-	return spec.Source, err
+	}
+	if configured.resolver == nil {
+		configured.resolver = BuildKitSourceResolver{}
+	}
+
+	return &buildContext{
+		spec:     spec,
+		client:   client,
+		resolver: configured.resolver,
+		initErr:  err,
+	}
 }
 
-// MainContext implements BuildClient.
-func (b *buildContext) MainContext(ctx context.Context, opts ...llb.LocalOption) (*llb.State, error) {
-	spec, err := b.g.Do(ctx, "main", func(ctx context.Context) (BuildSpec, error) {
-		return BuildSpec{}, nil
+// buildContext caches the resolved source names and LLB states for the
+// lifetime of this frontend invocation.
+func (b *buildContext) buildContext(ctx context.Context) (*buildContextState, error) {
+	if b.initErr != nil {
+		return nil, b.initErr
+	}
+	return b.group.Do(ctx, "initcontext", func(ctx context.Context) (*buildContextState, error) {
+		return b.initContext(ctx)
 	})
-	return spec.Context, err
 }
 
-// NamedContext implements BuildClient.
-func (b *buildContext) NamedContext(name string, opt loader.ContextOpt) (namedcontext.NamedContext, error) {
-	spec, err := b.g.Do(context.Background(), "named", func(ctx context.Context) (BuildSpec, error) {
-		return BuildSpec{}, nil
-	})
-	return spec.Named, err
+// DefaultMainContext builds the conventional local context source without
+// applying frontend ignore patterns. It is useful for frontends that do not
+// use the higher-level BuildClient.
+func DefaultMainContext(opts ...llb.LocalOption) *llb.State {
+	options := []llb.LocalOption{
+		llb.SharedKeyHint("context"),
+		llb.WithCustomName("[internal] load build context"),
+	}
+	options = append(options, opts...)
+	state := llb.Local("context", options...)
+	return &state
 }

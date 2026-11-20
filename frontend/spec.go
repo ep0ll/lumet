@@ -2,149 +2,205 @@ package frontend
 
 import (
 	"path"
+	"slices"
 	"strings"
 )
 
-// ContextOptKeys holds the frontend option key names used by the Dockerfile
-// (dockerui) context loading code. These are the strings that appear in the
-// BuildOpts.Opts map (or as --opt on the buildctl / buildx command line).
+// ContextOptKeys names the BuildKit frontend options used to select the
+// build-definition source and the main build context. These are option keys,
+// not option values.
 type ContextOptKeys struct {
-	// Filename is the option that overrides the default Dockerfile name
-	// (normally "Dockerfile").
-	// Example: --opt filename=Dockerfile.dev
-	Filename string // "filename"
+	// Filename overrides the entrypoint filename inside its source.
+	Filename string
 
-	// ContextLocalName is the option that overrides the local name used for
-	// the main build context (normally "context").
-	// Example: --opt contextkey=mycontext
-	ContextLocalName string // "contextkey"
+	// ContextLocalName overrides the local name used for the main context.
+	ContextLocalName string
 
-	// DockerfileLocalNames lists the option keys that force a particular
-	// local name for the Dockerfile source. The first matching key wins.
-	// Common values: "dockerfilekey", or a custom frontend-specific key
-	// such as "lumetkey".
-	DockerfileLocalNames []string // "lumetkey", "dockerfilekey"
-
-	// ContextSubDir is the option that selects a subdirectory inside the
-	// main context to treat as the root of the build context.
-	// Example: --opt contextsubdir=src
-	ContextSubDir string // "contextsubdir"
-
-	// DockerfileSubDir is the option that selects a subdirectory that
-	// contains the Dockerfile (when the Dockerfile is not at the root of
-	// its local source).
-	// Example: --opt lumetsubdir=docker
-	DockerfileSubDir string // "lumetsubdir"
-
-	// KeepGitDir is the build-arg key that controls whether a remote Git
-	// context retains its .git directory.
-	// Example: --opt build-arg:BUILDKIT_CONTEXT_KEEP_GIT_DIR=1
-	KeepGitDir string // "build-arg:BUILDKIT_CONTEXT_KEEP_GIT_DIR"
-}
-
-// Spec describes a frontend’s conventions for locating the build definition
-// (entrypoint) and its associated build context.
-//
-// It is used by the shared context-loading helpers so that the same code can
-// serve Dockerfile, Lumet, Earthfile, or any other similar frontend.
-type Spec struct {
-	// Name is a short identifier for the language / frontend.
-	// It appears in source-map attributes and diagnostic messages.
-	// Examples: "Dockerfile", "Lumet", "Earthfile".
-	Name string
-
-	// DefaultEntrypoint returns the canonical filename of the build definition
-	// for the given configuration (or an empty config string for the default).
-	// Examples: "Dockerfile", "Lumetfile", "Earthfile".
-	DefaultEntrypoint func(config string) string
-
-	// IgnoreFiles returns the candidate ignore-file names that should be
-	// considered for the given entrypoint, in priority order.
-	// The first existing file wins. May be nil when the frontend has no
-	// ignore-file concept.
-	// Example for Dockerfile: []string{".dockerignore"}
-	IgnoreFiles func(entrypoint string) []string
-
-	// DefaultContextLocalName is the local name used for the main build
-	// context when no override is supplied via options.
-	// Conventionally "context".
-	DefaultContextLocalName string
-
-	// EntrypointLocalNames lists the candidate local names that may contain
-	// the build definition (the entrypoint file).
-	// All names except the last are treated as optional overrides that are
-	// used only when present in the frontend options; the final name is the
-	// unconditional default.
-	// Example for Dockerfile: []string{"dockerfile"}
+	// EntrypointLocalNames contains option keys whose values select the
+	// build-definition local name. The first non-empty option wins.
 	EntrypointLocalNames []string
 
-	// OptKeys holds the exact option-key strings that the context-loading
-	// code will look up in BuildOpts.Opts.
+	// ContextSubDir scopes the main context to a directory inside its source.
+	ContextSubDir string
+
+	// EntrypointSubDir scopes the build-definition source to a directory.
+	EntrypointSubDir string
+
+	// KeepGitDir controls whether Git sources retain their .git directory.
+	KeepGitDir string
+
+	// DockerfileLocalNames is retained for source compatibility. New specs
+	// should use EntrypointLocalNames.
+	//
+	// Deprecated: use EntrypointLocalNames.
+	DockerfileLocalNames []string
+
+	// DockerfileSubDir is retained for source compatibility. New specs should
+	// use EntrypointSubDir.
+	//
+	// Deprecated: use EntrypointSubDir.
+	DockerfileSubDir string
+}
+
+// Spec describes the naming and ignore-file conventions of one BuildKit
+// frontend. It deliberately contains no parser, solver, or frontend-specific
+// implementation; those remain injectable at the consumer boundary.
+type Spec struct {
+	// Name identifies the language in source maps and diagnostics.
+	Name string
+
+	// DefaultEntrypoint returns the default build-definition filename for a
+	// frontend configuration. The empty configuration is used when the
+	// frontend has no configuration-specific entrypoint.
+	DefaultEntrypoint func(config string) string
+
+	// EntrypointFallback returns alternative entrypoint paths, in priority
+	// order. It is useful for conventions such as Dockerfile/dockerfile.
+	EntrypointFallback func(entrypoint string) []string
+
+	// IgnoreFiles returns ignore files associated with the main build-context
+	// root, in priority order. The first existing file is used. A nil callback
+	// means that this frontend has no context ignore-file convention.
+	IgnoreFiles func(entrypoint string) []string
+
+	// DefinitionIgnoreFiles returns entrypoint-specific ignore files that
+	// override IgnoreFiles when present. For example, Dockerfile frontends can
+	// return Dockerfile.dockerignore here and .dockerignore from IgnoreFiles.
+	DefinitionIgnoreFiles func(entrypoint string) []string
+
+	// IgnoreParser optionally parses an ignore file. When nil, the standard
+	// Moby ignorefile parser is used by the context package.
+	IgnoreParser func(filename string, data []byte) ([]string, error)
+
+	// DefaultContextLocalName is the BuildKit local name used when no
+	// context-local-name option is supplied. The conventional value is
+	// context.
+	DefaultContextLocalName string
+
+	// EntrypointLocalNames contains candidate BuildKit input/local names.
+	// The final element is the unconditional default; earlier elements may
+	// be selected by the option keys in OptKeys.EntrypointLocalNames.
+	EntrypointLocalNames []string
+
+	// OptKeys contains the exact option keys used to read source overrides.
 	OptKeys ContextOptKeys
 }
 
-// DefaultContextOptKeys returns the standard option key names expected by the
-// Dockerfile frontend’s context-loading code.
+// DefaultContextOptKeys returns the conventional BuildKit option names. The
+// filename option is frontend-neutral; frontend identity belongs in Name and
+// DefaultEntrypoint.
 func DefaultContextOptKeys() ContextOptKeys {
 	return ContextOptKeys{
-		Filename:             "Lumet",
+		Filename:             "filename",
 		ContextLocalName:     "contextkey",
-		DockerfileLocalNames: []string{"dockerfilekey"}, // add "lumetkey" (or any other aliases) if needed
+		EntrypointLocalNames: []string{"dockerfilekey"},
 		ContextSubDir:        "contextsubdir",
-		DockerfileSubDir:     "entrypointsubdir", // or "lumetsubdir" / "dockerfilesubdir" depending on the frontend
+		EntrypointSubDir:     "entrypointsubdir",
 		KeepGitDir:           "build-arg:BUILDKIT_CONTEXT_KEEP_GIT_DIR",
 	}
 }
 
-// LowerBaseFallback is the common "Dockerfile -> dockerfile" fallback.
-func LowerBaseFallback(def string) func(string) []string {
+// Clone returns a copy whose mutable slices are independent of the original.
+func (s Spec) Clone() Spec {
+	s.EntrypointLocalNames = slices.Clone(s.EntrypointLocalNames)
+	s.OptKeys.EntrypointLocalNames = slices.Clone(s.OptKeys.EntrypointLocalNames)
+	s.OptKeys.DockerfileLocalNames = slices.Clone(s.OptKeys.DockerfileLocalNames)
+	return s
+}
+
+// LowerBaseFallback returns the lower-case basename alternative for a
+// canonical entrypoint, preserving its parent directory.
+func LowerBaseFallback(defaultEntrypoint string) func(string) []string {
 	return func(filename string) []string {
-		if path.Base(filename) != def {
+		if path.Base(filename) != defaultEntrypoint {
 			return nil
 		}
-		return []string{path.Join(path.Dir(filename), strings.ToLower(def))}
+		fallback := path.Join(path.Dir(filename), strings.ToLower(defaultEntrypoint))
+		if fallback == filename {
+			return nil
+		}
+		return []string{fallback}
 	}
 }
 
-// SuffixIgnore yields "<entrypoint><suffix>", e.g. Dexfile.dexnore.
+// SuffixIgnore returns the conventional entrypoint-plus-suffix ignore path.
 func SuffixIgnore(suffix string) func(string) []string {
-	return func(filename string) []string { return []string{filename + suffix} }
+	return func(entrypoint string) []string {
+		if suffix == "" || entrypoint == "" {
+			return nil
+		}
+		return []string{entrypoint + suffix}
+	}
 }
 
-// Validate fills sensible defaults and rejects unusable specs.
-// It is safe to call multiple times; later calls are no-ops once the
-// required fields are already populated.
+// Validate fills standard option-key defaults and rejects unusable specs.
+// It does not mutate caller-owned slices.
 func (s *Spec) Validate() error {
-	if s.Name == "" {
+	if s == nil {
+		return invalidSpec("spec is nil")
+	}
+	if strings.TrimSpace(s.Name) == "" {
 		return invalidSpec("Name is required")
 	}
 	if s.DefaultEntrypoint == nil {
 		return invalidSpec("DefaultEntrypoint is required")
 	}
 
+	s.EntrypointLocalNames = slices.Clone(s.EntrypointLocalNames)
+	s.OptKeys.EntrypointLocalNames = slices.Clone(s.OptKeys.EntrypointLocalNames)
+	s.OptKeys.DockerfileLocalNames = slices.Clone(s.OptKeys.DockerfileLocalNames)
+
 	if s.DefaultContextLocalName == "" {
 		s.DefaultContextLocalName = "context"
 	}
-
 	if len(s.EntrypointLocalNames) == 0 {
-		// Fallback that works for the classic Dockerfile frontend.
-		// Frontends that use a different local name should set the field
-		// explicitly before calling Validate.
 		s.EntrypointLocalNames = []string{"dockerfile"}
 	}
-
-	// Ensure the option-key set is complete.  We only replace the whole
-	// struct when the primary key is missing; callers that want a partial
-	// override can populate the fields they care about.
-	if s.OptKeys.Filename == "" {
-		s.OptKeys = DefaultContextOptKeys()
+	for i, name := range s.EntrypointLocalNames {
+		if strings.TrimSpace(name) == "" {
+			return invalidSpec("EntrypointLocalNames contains an empty name")
+		}
+		s.EntrypointLocalNames[i] = strings.TrimSpace(name)
 	}
 
+	// Migrate the Dockerfile-specific option fields without removing support
+	// for existing callers that initialized the earlier spec shape.
+	if len(s.OptKeys.EntrypointLocalNames) == 0 && len(s.OptKeys.DockerfileLocalNames) != 0 {
+		s.OptKeys.EntrypointLocalNames = slices.Clone(s.OptKeys.DockerfileLocalNames)
+	}
+	if s.OptKeys.EntrypointSubDir == "" {
+		s.OptKeys.EntrypointSubDir = s.OptKeys.DockerfileSubDir
+	}
+
+	defaults := DefaultContextOptKeys()
+	if s.OptKeys.Filename == "" {
+		s.OptKeys.Filename = defaults.Filename
+	}
+	if s.OptKeys.ContextLocalName == "" {
+		s.OptKeys.ContextLocalName = defaults.ContextLocalName
+	}
+	if len(s.OptKeys.EntrypointLocalNames) == 0 {
+		s.OptKeys.EntrypointLocalNames = slices.Clone(defaults.EntrypointLocalNames)
+	}
+	if s.OptKeys.ContextSubDir == "" {
+		s.OptKeys.ContextSubDir = defaults.ContextSubDir
+	}
+	if s.OptKeys.EntrypointSubDir == "" {
+		s.OptKeys.EntrypointSubDir = defaults.EntrypointSubDir
+	}
+	if s.OptKeys.KeepGitDir == "" {
+		s.OptKeys.KeepGitDir = defaults.KeepGitDir
+	}
+	for i, key := range s.OptKeys.EntrypointLocalNames {
+		if strings.TrimSpace(key) == "" {
+			return invalidSpec("OptKeys.EntrypointLocalNames contains an empty key")
+		}
+		s.OptKeys.EntrypointLocalNames[i] = strings.TrimSpace(key)
+	}
 	return nil
 }
 
-// InvalidSpecError is returned by Spec.Validate when a required field is
-// missing or the configuration is otherwise unusable.
+// InvalidSpecError is returned when a frontend specification is incomplete.
 type InvalidSpecError struct {
 	Msg string
 }
@@ -156,4 +212,3 @@ func (e *InvalidSpecError) Error() string {
 func invalidSpec(msg string) error {
 	return &InvalidSpecError{Msg: msg}
 }
-

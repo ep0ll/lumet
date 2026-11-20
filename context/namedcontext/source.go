@@ -12,7 +12,7 @@ import (
 
 const maxDepth = 10
 
-// Source implements dexfile.NamedContext.
+// Source implements a BuildKit named context.
 type Source struct {
 	input            string
 	name             string
@@ -35,7 +35,7 @@ func (s *Source) load(ctx context.Context, depth int) (*llb.State, *dockerspec.D
 		Name:             s.name,
 		NameWithPlatform: s.nameWithPlatform,
 		Client:           s.client,
-		Opt:              s.opt,
+		Opt:              s.opt.Clone(),
 		Depth:            depth,
 		Retry: func(newInput string) (*llb.State, *dockerspec.DockerOCIImage, error) {
 			next := *s
