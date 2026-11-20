@@ -204,7 +204,6 @@ func (b *buildContext) BuildDefinition(ctx context.Context, opts ...llb.LocalOpt
 	}
 
 	definitionIgnoreFiles := b.ignoreFiles(b.spec.DefinitionIgnoreFiles, bctx.filename)
-	contextIgnoreFiles := b.ignoreFiles(b.spec.IgnoreFiles, bctx.filename)
 
 	state := bctx.definitionState
 	if state == nil {
