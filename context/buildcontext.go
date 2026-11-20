@@ -257,27 +257,7 @@ func (b *buildContext) BuildDefinition(ctx context.Context, opts ...llb.LocalOpt
 	}
 
 	ignore := func(ctx context.Context) ([]string, error) {
-		if len(definitionIgnoreFiles) != 0 {
-			patterns, found, err := b.readIgnoreFiles(
-				ctx, state, bctx.definitionLocalName, bctx.definitionSubDir,
-				definitionIgnoreFiles, ref,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read entrypoint ignore files: %w", err)
-			}
-			if found {
-				return patterns, nil
-			}
-		}
-
-		patterns, _, err := b.readIgnoreFiles(
-			ctx, bctx.mainState, bctx.mainLocalName, bctx.mainSubDir,
-			contextIgnoreFiles, nil,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read build-context ignore files: %w", err)
-		}
-		return patterns, nil
+		return b.ignorePatterns(ctx, bctx, ref)
 	}
 
 	return definition.NewSource(sourceMap, ignore, warn), nil
@@ -296,11 +276,7 @@ func (b *buildContext) MainContext(ctx context.Context, opts ...llb.LocalOption)
 		return &state, nil
 	}
 
-	source, err := b.BuildDefinition(ctx)
-	if err != nil {
-		return nil, err
-	}
-	excludes, err := source.IgnorePatterns(ctx)
+	excludes, err := b.ignorePatterns(ctx, bctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load build-context ignore patterns: %w", err)
 	}
@@ -431,6 +407,37 @@ func (b *buildContext) readIgnoreFiles(
 		return patterns, true, nil
 	}
 	return nil, false, nil
+}
+
+
+func (b *buildContext) ignorePatterns(
+	ctx context.Context,
+	bctx *buildContextState,
+	definitionRef gwclient.Reference,
+) ([]string, error) {
+	definitionIgnoreFiles := b.ignoreFiles(b.spec.DefinitionIgnoreFiles, bctx.filename)
+	if len(definitionIgnoreFiles) != 0 {
+		patterns, found, err := b.readIgnoreFiles(
+			ctx, bctx.definitionState, bctx.definitionLocalName, bctx.definitionSubDir,
+			definitionIgnoreFiles, definitionRef,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read entrypoint ignore files: %w", err)
+		}
+		if found {
+			return patterns, nil
+		}
+	}
+
+	contextIgnoreFiles := b.ignoreFiles(b.spec.IgnoreFiles, bctx.filename)
+	patterns, _, err := b.readIgnoreFiles(
+		ctx, bctx.mainState, bctx.mainLocalName, bctx.mainSubDir,
+		contextIgnoreFiles, nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read build-context ignore files: %w", err)
+	}
+	return patterns, nil
 }
 
 func (b *buildContext) parseIgnoreFile(filename string, data []byte) ([]string, error) {
