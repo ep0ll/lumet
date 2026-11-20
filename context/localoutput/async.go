@@ -14,6 +14,7 @@ type AsyncOutput struct {
 	Name             string
 	NameWithPlatform string
 	SessionID        string
+	FollowPaths      []string
 	Excludes         []string
 	Extra            func() []llb.LocalOption
 	SharedKey        string
@@ -41,7 +42,12 @@ func (a *AsyncOutput) materialise() {
 		llb.WithCustomName("[context " + a.NameWithPlatform + "] load from client"),
 		llb.SessionID(a.SessionID),
 		llb.SharedKeyHint(sharedKey),
-		llb.ExcludePatterns(a.Excludes),
+	}
+	if len(a.FollowPaths) != 0 {
+		opts = append(opts, llb.FollowPaths(a.FollowPaths))
+	}
+	if len(a.Excludes) != 0 {
+		opts = append(opts, llb.ExcludePatterns(a.Excludes))
 	}
 	if a.Extra != nil {
 		opts = append(opts, a.Extra()...)
