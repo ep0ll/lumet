@@ -50,3 +50,27 @@ func ReadFile(ctx context.Context, ref client.Reference, filename string) ([]byt
 	}
 	return dt, nil
 }
+
+// HeaderSize is enough bytes to sniff archive magic numbers and a tar header.
+const HeaderSize = 1024
+
+// ReadFileHead reads at most n bytes from the start of filename in ref.
+// Unlike ReadFile it never rejects large files: only the requested range is
+// loaded, so it is safe for sniffing the type of arbitrarily large files.
+// n is clamped to [1, maxFileSize] so a bad value cannot exceed the gRPC limit.
+func ReadFileHead(ctx context.Context, ref client.Reference, filename string, n int) ([]byte, error) {
+	if n < 1 {
+		n = 1
+	}
+	if n > maxFileSize {
+		n = maxFileSize
+	}
+	dt, err := ref.ReadFile(ctx, client.ReadRequest{
+		Filename: filename,
+		Range:    &client.FileRange{Offset: 0, Length: n},
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read head of %s", filename)
+	}
+	return dt, nil
+}

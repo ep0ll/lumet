@@ -2,12 +2,14 @@ package loader
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/ep0ll/lumet/frontend"
 	"github.com/moby/buildkit/client/llb"
+	gwpb "github.com/moby/buildkit/frontend/gateway/pb"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 )
 
 // Request is the single data bag passed to every concrete loader.
@@ -25,13 +27,19 @@ type Request struct {
 func Load(ctx context.Context, req Request) (*llb.State, *dockerspec.DockerOCIImage, error) {
 	scheme, rest, err := splitScheme(req.Input)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "invalid context specifier %q for %s", req.Input, req.NameWithPlatform)
+		st, desc, serr := SourceType(ctx, req)
+		if serr != nil {
+			return nil, nil, errors.Join(
+				fmt.Errorf("invalid context specifier %q for %s: %w", req.Input, req.NameWithPlatform, err),
+				serr,
+			)
+		}
+		return st, desc, nil
 	}
 
-	// Backwards compatibility: git@host:... 
+	// Backwards compatibility: git@host:...
 	if strings.HasPrefix(scheme, "git@") {
-		scheme = "git"
-		rest = req.Input
+		scheme, rest = "git", req.Input
 	}
 
 	switch scheme {
@@ -48,7 +56,14 @@ func Load(ctx context.Context, req Request) (*llb.State, *dockerspec.DockerOCIIm
 	case "http", "https":
 		return loadHTTP(ctx, req.Input, req)
 	default:
-		return nil, nil, errors.Errorf("unsupported context source %q for %s", scheme, req.NameWithPlatform)
+		st, desc, serr := SourceType(ctx, req)
+		if serr != nil {
+			return nil, nil, errors.Join(
+				fmt.Errorf("unsupported context source %q for %s", scheme, req.NameWithPlatform),
+				serr,
+			)
+		}
+		return st, desc, nil
 	}
 }
 
@@ -63,4 +78,25 @@ func splitScheme(s string) (scheme, rest string, err error) {
 // label builds the conventional BuildKit custom name.
 func label(nameWithPlatform, action string) string {
 	return "[context " + nameWithPlatform + "] " + action
+}
+
+// SourceType infers the source for inputs without a known scheme by trying
+// each loader in order: git, http(s), frontend input (if supported), local.
+func SourceType(ctx context.Context, req Request) (*llb.State, *dockerspec.DockerOCIImage, error) {
+	if st, desc, err := loadGit(req); err == nil {
+		return st, desc, nil
+	}
+
+	if st, desc, err := loadHTTP(ctx, req.Input, req); err == nil {
+		return st, desc, nil
+	}
+
+	opts := req.Client.BuildOpts() // copy: Supports has a pointer receiver
+	if opts.Caps.Supports(gwpb.CapFrontendInputs) == nil {
+		if st, desc, err := loadInput(ctx, req.Input, req); err == nil {
+			return st, desc, nil
+		}
+	}
+
+	return loadLocal(ctx, req.Input, req)
 }
