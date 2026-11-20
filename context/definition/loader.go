@@ -22,12 +22,7 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 	if err := opts.Source.Validate(); err != nil {
 		return nil, fmt.Errorf("build definition source: %w", err)
 	}
-	resolver := opts.Resolver
-	if resolver == nil {
-		resolver = l.Resolver
-	}
-
-	fallbacks, err := source.CleanPaths(opts.Fallbacks)
+		fallbacks, err := source.CleanPaths(opts.Fallbacks)
 	if err != nil {
 		return nil, fmt.Errorf("build definition fallback paths: %w", err)
 	}
@@ -54,7 +49,7 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 	resolveOptions := opts.Options.Clone()
 	resolveOptions.FollowPaths = follow
 	resolveOptions.ExcludePatterns = nil
-	resolved, err := source.Resolve(ctx, client, resolver, opts.Source, resolveOptions)
+	resolved, err := source.ResolveUsing(ctx, client, opts.Resolver, l.Resolver, opts.Source, resolveOptions)
 	if err != nil {
 		return nil, fmt.Errorf("resolve build definition source: %w", err)
 	}

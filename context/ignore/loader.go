@@ -36,11 +36,7 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 		return nil, fmt.Errorf("ignore-file paths: %w", err)
 	}
 
-	resolver := opts.Resolver
-	if resolver == nil {
-		resolver = l.Resolver
-	}
-	followPaths := append(append([]string(nil), opts.FollowPaths...), files...)
+		followPaths := append(append([]string(nil), opts.FollowPaths...), files...)
 	followPaths, err = source.CleanPaths(followPaths)
 	if err != nil {
 		return nil, fmt.Errorf("ignore source follow paths: %w", err)
@@ -48,7 +44,7 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 	resolveOptions := opts.Options.Clone()
 	resolveOptions.FollowPaths = followPaths
 	resolveOptions.ExcludePatterns = nil
-	resolved, err := source.Resolve(ctx, client, resolver, opts.Source, resolveOptions)
+	resolved, err := source.ResolveUsing(ctx, client, opts.Resolver, l.Resolver, opts.Source, resolveOptions)
 	if err != nil {
 		return nil, fmt.Errorf("resolve ignore-file source: %w", err)
 	}

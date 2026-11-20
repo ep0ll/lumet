@@ -31,17 +31,12 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 		return nil, fmt.Errorf("main context subdirectory: %w", err)
 	}
 
-	resolver := opts.Resolver
-	if resolver == nil {
-		resolver = l.Resolver
-	}
-
-	excludes := append([]string(nil), opts.ExcludePatterns...)
+		excludes := append([]string(nil), opts.ExcludePatterns...)
 	if opts.ApplyIgnorePatterns {
 		excludes = append(excludes, opts.IgnorePatterns...)
 	}
 
-	followPaths, err := llbutil.CleanRelativePaths(opts.FollowPaths)
+	followPaths, err := source.CleanPaths(opts.FollowPaths)
 	if err != nil {
 		return nil, fmt.Errorf("main context follow paths: %w", err)
 	}
@@ -51,7 +46,7 @@ func (l BuildKitLoader) Load(ctx context.Context, client frontend.Client, opts O
 	if spec.Kind == source.KindLocal {
 		resolveOptions.ExcludePatterns = excludes
 	}
-	resolved, err := source.Resolve(ctx, client, resolver, spec, resolveOptions)
+	resolved, err := source.ResolveUsing(ctx, client, opts.Resolver, l.Resolver, spec, resolveOptions)
 	if err != nil {
 		return nil, fmt.Errorf("resolve main context: %w", err)
 	}

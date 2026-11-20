@@ -24,3 +24,11 @@ func Resolve(ctx context.Context, client frontend.Client, resolver Resolver, spe
 func CleanPaths(paths []string) ([]string, error) {
 	return llbutil.CleanRelativePaths(paths)
 }
+
+// ResolveUsing applies per-call resolver precedence over a loader resolver.
+func ResolveUsing(ctx context.Context, client frontend.Client, primary, fallback Resolver, spec Spec, opts Options) (*Resolved, error) {
+	if primary == nil {
+		primary = fallback
+	}
+	return Resolve(ctx, client, primary, spec, opts)
+}
