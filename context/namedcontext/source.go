@@ -37,10 +37,10 @@ func (s *Source) load(ctx context.Context, depth int) (*llb.State, *dockerspec.D
 		Client:           s.client,
 		Opt:              s.opt,
 		Depth:            depth,
-		Retry: func(newInput string) (*llb.State, *dockerspec.DockerOCIImage, error) {
+		RetryHandler: loader.RequestRetryFunc(func(newInput string) (*llb.State, *dockerspec.DockerOCIImage, error) {
 			next := *s
 			next.input = newInput
 			return next.load(ctx, depth+1)
-		},
+		}),
 	})
 }

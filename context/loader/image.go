@@ -55,10 +55,10 @@ func redirectIfNonImage(err error, req Request) (*llb.State, *dockerspec.DockerO
 	newInput := before + ":" + after
 	req.Client = frontend.SetOpt(req.Client, "context:"+req.NameWithPlatform, newInput)
 
-	if req.Retry == nil {
+	if req.RetryHandler == nil {
 		return nil, nil, errors.New("retry callback required")
 	}
-	return req.Retry(newInput)
+	return req.RetryHandler.Retry(newInput)
 }
 
 func imageOptions(req Request, ref string) []llb.ImageOption {

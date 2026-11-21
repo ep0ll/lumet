@@ -12,6 +12,16 @@ import (
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 )
 
+type RequestRetryFunc func(newInput string) (*llb.State, *dockerspec.DockerOCIImage, error)
+
+type RequestRetry interface {
+	Retry(newInput string) (*llb.State, *dockerspec.DockerOCIImage, error)
+}
+
+func (r RequestRetryFunc) Retry(newInput string) (*llb.State, *dockerspec.DockerOCIImage, error) {
+	return r(newInput)
+}
+
 // Request is the single data bag passed to every concrete loader.
 type Request struct {
 	Input            string
@@ -20,7 +30,7 @@ type Request struct {
 	Client           frontend.Client
 	Opt              ContextOpt
 	Depth            int
-	Retry            func(newInput string) (*llb.State, *dockerspec.DockerOCIImage, error)
+	RetryHandler     RequestRetry
 }
 
 // Load is the only entry point of the loader subpackage.
