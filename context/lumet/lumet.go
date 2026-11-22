@@ -10,13 +10,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-type definitionResult struct {
-	Data     []byte
-	Filename string
+// fileResult is cached per (state digest, filename). Found=false caches misses,
+// so probing absent candidates doesn't re-read on every call.
+type fileResult struct {
+	Data  []byte
+	Found bool
 }
 
-var definitionCache flightcontrol.CachedGroup[*definitionResult]
-
+var (
+	fileCache flightcontrol.CachedGroup[*fileResult]
+)
 
 const (
 	CandidateLPy = ".lumet/main.lpy"
@@ -31,7 +34,7 @@ func DefaultCandidates() []string {
 }
 
 func LoadDefinition(ctx context.Context, st llb.State, c client.Client, candidates ...string) ([]byte, string, error) {
-	key, err := llbutil.StateDigest(ctx, st, c)
+	digest, err := llbutil.StateDigest(ctx, st, c)
 	if err != nil {
 		return nil, "", err
 	}
@@ -40,22 +43,31 @@ func LoadDefinition(ctx context.Context, st llb.State, c client.Client, candidat
 		candidates = DefaultCandidates()
 	}
 
-	res, err := definitionCache.Do(ctx, key.String(), func(ctx context.Context) (*definitionResult, error) {
-		ref, err := llbutil.SingleRef(ctx, st, c)
-		if err != nil {
-			return nil, err
-		}
+	for _, name := range candidates {
+		key := digest.String() + "\x00" + name
 
-		dt, name, err := llbutil.ReadFirstCandidate(ctx, ref, candidates)
+		res, err := fileCache.Do(ctx, key, func(ctx context.Context) (*fileResult, error) {
+			ref, err := llbutil.SingleRef(ctx, st, c)
+			if err != nil {
+				return nil, err
+			}
+			dt, err := llbutil.ReadFile(ctx, ref, name)
+			if err != nil {
+				if llbutil.IsFileTooLarge(err) {
+					return nil, err
+				}
+				return &fileResult{}, nil
+			}
+			return &fileResult{Data: dt, Found: true}, nil
+		})
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read definition (tried %v)", candidates)
+			return nil, "", errors.Wrapf(err, "failed to read %s", name)
 		}
-		return &definitionResult{Data: dt, Filename: name}, nil
-	})
-	if err != nil {
-		return nil, "", err
+		if res.Found {
+			return res.Data, name, nil
+		}
 	}
-	return res.Data, res.Filename, nil
+	return nil, "", errors.Errorf("no definition found (tried %v)", candidates)
 }
 
 // UnderLumet returns a new state that contains the entire contents of `st`

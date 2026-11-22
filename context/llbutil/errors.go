@@ -21,3 +21,8 @@ func IsNotFound(err error) bool {
 		errdefs.IsNotFound(err) ||
 		status.Code(err) == codes.NotFound
 }
+
+func IsFileTooLarge(err error) bool {
+	var e *fileTooLargeError
+	return errors.As(err, &e)
+}

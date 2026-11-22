@@ -29,13 +29,17 @@ func SingleRef(ctx context.Context, st llb.State, c client.Client) (client.Refer
 	return res.SingleRef()
 }
 
-func ReadFirstCandidate(ctx context.Context, ref client.Reference, candidates []string) (data []byte, name string, err error) {
+func ReadFirstCandidate(ctx context.Context, ref client.Reference, candidates []string) ([]byte, string, error) {
 	var lastErr error
-	for _, name = range candidates {
-		if dt, err := ReadFile(ctx, ref, name); err == nil {
+	for _, name := range candidates {
+		dt, err := ReadFile(ctx, ref, name)
+		if err == nil {
 			return dt, name, nil
 		}
 		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = errors.New("no candidates provided")
 	}
 	return nil, "", lastErr
 }
