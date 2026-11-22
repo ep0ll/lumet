@@ -57,3 +57,19 @@ func LoadDefinition(ctx context.Context, st llb.State, c client.Client, candidat
 	}
 	return res.Data, res.Filename, nil
 }
+
+// UnderLumet returns a new state that contains the entire contents of `st`
+// under the directory ".lumet".
+//
+// Equivalent to:
+//
+//	Scratch
+//	└── .lumet/          ← everything that was previously at the root of st
+func UnderLumet(st llb.State) llb.State {
+	return llb.Scratch().File(
+		llb.Copy(st, "/", ".lumet", &llb.CopyInfo{
+			CopyDirContentsOnly: true,
+			CreateDestPath:      true,
+		}),
+	)
+}
