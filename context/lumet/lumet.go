@@ -46,7 +46,7 @@ func LoadDefinition(ctx context.Context, st llb.State, c client.Client, candidat
 			return nil, err
 		}
 
-		dt, name, err := llbutil.ReadFileCandidates(ctx, ref, candidates)
+		dt, name, err := llbutil.ReadFirstCandidate(ctx, ref, candidates)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read definition (tried %v)", candidates)
 		}

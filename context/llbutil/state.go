@@ -29,7 +29,7 @@ func SingleRef(ctx context.Context, st llb.State, c client.Client) (client.Refer
 	return res.SingleRef()
 }
 
-func ReadFileCandidates(ctx context.Context, ref client.Reference, candidates []string) (data []byte, name string, err error) {
+func ReadFirstCandidate(ctx context.Context, ref client.Reference, candidates []string) (data []byte, name string, err error) {
 	var lastErr error
 	for _, name = range candidates {
 		if dt, err := ReadFile(ctx, ref, name); err == nil {
