@@ -135,11 +135,13 @@ The package's public Go declarations are:
 | `ExecStateValue` | Starlark value wrapping `llb.ExecState`; use `Unwrap`. |
 | `FileActionValue` | Starlark value wrapping `*llb.FileAction`; use `Unwrap`. |
 | `DefinitionValue` | Starlark value wrapping `*llb.Definition`; use `Unwrap`. |
-| `WrapState` | Adapt a native BuildKit state to a Starlark value. |
+| `WrapState` / `WrapExecState` / `WrapFileAction` / `WrapDefinition` | Adapt native BuildKit values to Starlark values. |
+| `WrapOption` | Inject a native option into predeclared globals; its interface family is checked when consumed. |
 
 The wrapped native values have private fields. Starlark code cannot forge
-invalid BuildKit values by assigning internal Go fields. Option constructors
-return opaque option values tagged with their BuildKit interface family
+invalid BuildKit values by assigning internal Go fields. Go applications can
+extend the module by placing `WrapOption(nativeOption)` in predeclared globals.
+Option constructors return opaque option values tagged with their BuildKit interface family
 (`RunOption`, `ImageOption`, `MountOption`, etc.). A wrong-family option is
 reported as a type error before calling BuildKit.
 
