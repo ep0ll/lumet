@@ -146,6 +146,16 @@ func valueToJSON(value starlark.Value) (any, error) {
 			out[key] = val
 		}
 		return out, nil
+	case starlark.HasAttrs:
+		out := make(map[string]any)
+		for _, name := range v.AttrNames() {
+			item, err := v.Attr(name)
+			if err != nil { return nil, err }
+			val, err := valueToJSON(item)
+			if err != nil { return nil, err }
+			out[name] = val
+		}
+		return out, nil
 	case *starlark.List, starlark.Tuple:
 		iter := starlark.Iterate(value)
 		if iter == nil { return nil, fmt.Errorf("%s is not iterable", value.Type()) }
@@ -167,8 +177,18 @@ func valueToJSON(value starlark.Value) (any, error) {
 
 func protoFromValue(value starlark.Value, message proto.Message, name string) error {
 	if value == nil || value == starlark.None { return nil }
-	if dict, ok := value.(*starlark.Dict); ok {
-		object, err := valueToJSON(dict)
+	if _, ok := value.(*starlark.Dict); ok {
+		object, err := valueToJSON(value)
+		if err != nil { return err }
+		data, err := json.Marshal(object)
+		if err != nil { return err }
+		if err := (protojson.UnmarshalOptions{}).Unmarshal(data, message); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+		return nil
+	}
+	if _, ok := value.(starlark.HasAttrs); ok {
+		object, err := valueToJSON(value)
 		if err != nil { return err }
 		data, err := json.Marshal(object)
 		if err != nil { return err }
