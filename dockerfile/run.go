@@ -17,6 +17,8 @@ func Run(command Command, opts ...Option) Instruction {
 		if err := b.requireStage("RUN"); err != nil {
 			return err
 		}
+		b.progressGroup = options.ProgressGroup
+		b.progressTitle = options.ProgressTitle
 		args, err := commandArgs(command, b.Image.Config.Shell, b.Platform.OS)
 		if err != nil {
 			return fmt.Errorf("RUN: %w", err)
