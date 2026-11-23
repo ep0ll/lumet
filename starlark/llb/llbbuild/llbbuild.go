@@ -80,16 +80,7 @@ func withConstraintsBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark
 	return &buildOptionValue{option:buildkitllbbuild.WithConstraints(option)},nil
 }
 func starlarkllbOption(value starlark.Value,want string)(buildkitllb.ConstraintsOpt,error){
-	// WrapOption uses an opaque carrier; consumers validate the native option
-	// interface rather than trusting the Starlark type label.
-	switch v:=value.(type){
-	case interface{Unwrap() any}:
-		option,ok:=v.Unwrap().(buildkitllb.ConstraintsOpt)
-		if ok{return option,nil}
-	}
-	// Constraints options produced by this module's parent facade are opaque
-	// Starlark values; expose conversion through a typed Go-side helper.
-	return unwrapConstraintOption(value,want)
+	return starlarkllb.UnwrapOption[buildkitllb.ConstraintsOpt](value,want)
 }
 func buildBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	options,err:=buildOptions(args,kwargs);if err!=nil{return nil,err}
