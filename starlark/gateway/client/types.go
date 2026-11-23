@@ -36,11 +36,20 @@ func (v *recordValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable:
 func (v *recordValue) Attr(name string) (starlark.Value, error) {
 	if v == nil { return nil, fmt.Errorf("gateway.client: nil %s", name) }
 	if value, ok := v.fields[name]; ok { return value, nil }
+	if v.name == "solve_request" && name == "clone" {
+		return bind("solve_request.clone", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := starlark.UnpackArgs("solve_request.clone", args, kwargs); err != nil { return nil, err }
+			request, err := recordFrom[gwclient.SolveRequest](v, "solve_request")
+			if err != nil { return nil, err }
+			return solveRequestValue(request.Clone())
+		}), nil
+	}
 	return nil, nil
 }
 func (v *recordValue) AttrNames() []string {
-	names := make([]string, 0, len(v.fields))
+	names := make([]string, 0, len(v.fields)+1)
 	for name := range v.fields { names = append(names, name) }
+	if v.name == "solve_request" { names = append(names, "clone") }
 	sort.Strings(names)
 	return names
 }
@@ -301,18 +310,49 @@ func solveRequestBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.
 		}
 		iter.Done()
 	}
-	return solveRequestValue(req), nil
+	return solveRequestValue(req)
 }
 
-func solveRequestValue(req gwclient.SolveRequest) *recordValue {
+func solveRequestValue(req gwclient.SolveRequest) (*recordValue, error) {
 	fields := starlark.StringDict{
 		"evaluate": starlark.Bool(req.Evaluate),
 		"definition": starlark.None,
 		"frontend": starlark.String(req.Frontend),
 		"frontend_opt": stringMapValue(req.FrontendOpt),
+		"frontend_inputs": starlark.NewDict(len(req.FrontendInputs)),
+		"cache_imports": starlark.NewList(nil),
+		"source_policies": starlark.NewList(nil),
 	}
-	if req.Definition != nil { fields["definition"] = starlarkllb.WrapDefinitionProto(req.Definition) }
-	return newRecord("solve_request", req, fields)
+	if req.Definition != nil {
+		fields["definition"] = starlarkllb.WrapDefinitionProto(req.Definition)
+	}
+	inputs := fields["frontend_inputs"].(*starlark.Dict)
+	for name, definition := range req.FrontendInputs {
+		if err := inputs.SetKey(starlark.String(name), starlarkllb.WrapDefinitionProto(definition)); err != nil {
+			return nil, err
+		}
+	}
+	cacheImports := make([]starlark.Value, len(req.CacheImports))
+	for i, entry := range req.CacheImports {
+		cacheImports[i] = newRecord("cache_options_entry", entry, starlark.StringDict{
+			"type": starlark.String(entry.Type), "attrs": stringMapValue(entry.Attrs),
+		})
+	}
+	fields["cache_imports"] = starlark.NewList(cacheImports)
+	policies := make([]starlark.Value, len(req.SourcePolicies))
+	for i, policy := range req.SourcePolicies {
+		if policy == nil {
+			policies[i] = starlark.None
+			continue
+		}
+		data, err := proto.Marshal(policy)
+		if err != nil {
+			return nil, fmt.Errorf("solve_request.source_policies[%d]: %w", i, err)
+		}
+		policies[i] = starlark.Bytes(data)
+	}
+	fields["source_policies"] = starlark.NewList(policies)
+	return newRecord("solve_request", req, fields), nil
 }
 
 func cacheOptionsFromValue(value starlark.Value) (gwclient.CacheOptionsEntry, error) {
