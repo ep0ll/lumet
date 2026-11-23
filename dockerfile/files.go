@@ -66,6 +66,7 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 			return fmt.Errorf("ADD: at least one source is required")
 		}
 		destination = b.expand(destination)
+		destination = b.expand(destination)
 		if destination == "" {
 			return fmt.Errorf("ADD: destination cannot be empty")
 		}
