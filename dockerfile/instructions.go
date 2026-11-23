@@ -13,7 +13,6 @@ import (
 
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/util/system"
-	"github.com/ep0ll/lumet/dockerfile/expand"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 )
 
@@ -580,38 +579,6 @@ func setEnv(env []string, key, value string) []string {
 		result = append(result, key+"="+value)
 	}
 	return result
-}
-
-func expandVariables(value string, args map[string]string, env []string) string {
-	return expandVariablesWithEscape(value, mergeEnvironment(args, env), 0)
-}
-
-func expandVariablesWithEscape(value string, environment map[string]string, escape rune) string {
-	expanded, err := expand.New(
-		expand.Config{Escape: escape},
-		expand.MapLookup(environment),
-	).Expand(value)
-	if err != nil {
-		// Instruction APIs historically expose string expansion. Malformed
-		// expressions are left untouched; callers needing strict validation
-		// can use the standalone dockerfile/expand package directly.
-		return value
-	}
-	return expanded
-}
-
-func mergeEnvironment(args map[string]string, env []string) map[string]string {
-	environment := make(map[string]string, len(args)+len(env))
-	for key, value := range args {
-		environment[key] = value
-	}
-	for _, item := range env {
-		key, value, found := strings.Cut(item, "=")
-		if found {
-			environment[key] = value
-		}
-	}
-	return environment
 }
 
 func expandPorts(value string) ([]string, error) {
