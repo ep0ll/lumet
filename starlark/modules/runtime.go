@@ -28,6 +28,10 @@ type ExecOptions struct {
 	// Print receives messages emitted by Starlark's print() builtin.
 	Print func(thread *starlark.Thread, message string)
 
+	// GatewayClient binds the active BuildKit gateway client to the dynamic
+	// gateway/client Starlark module. It is scoped to this evaluation.
+	GatewayClient gwclient.Client
+
 	// Loader resolves application modules after the built-in registry.
 	Loader ModuleLoader
 }
@@ -111,6 +115,9 @@ func ExecWithOptions(ctx context.Context, filename string, src any, predeclared 
 		predeclared = Predeclared()
 	}
 	thread := NewThreadWithLoader(ctx, options.Loader)
+	if options.GatewayClient != nil {
+		thread = NewThreadWithGateway(ctx, options.GatewayClient, options.Loader)
+	}
 	thread.Print = options.Print
 	if options.MaxSteps > 0 {
 		thread.SetMaxExecutionSteps(options.MaxSteps)
