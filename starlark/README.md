@@ -212,6 +212,8 @@ load(
     "new_container_request",
     "start_request",
     "read_request",
+    "stat_request",
+    "net_mode_unset",
     "warn_opts",
 )
 
