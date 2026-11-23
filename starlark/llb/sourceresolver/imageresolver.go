@@ -134,6 +134,7 @@ func resolveGitResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args sta
 		"commit_object?", &commitObjectValue, "tag_object?", &tagObjectValue,
 	); err != nil { return nil, err }
 	var commitObject, tagObject []byte
+	var err error
 	if commitObjectValue != starlark.None {
 		commitObject, err = bytesArg("ResolveGitResponse.commit_object", commitObjectValue)
 		if err != nil { return nil, err }
