@@ -66,7 +66,6 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 			return fmt.Errorf("ADD: at least one source is required")
 		}
 		destination = b.expand(destination)
-		destination = b.expand(destination)
 		if destination == "" {
 			return fmt.Errorf("ADD: destination cannot be empty")
 		}
@@ -119,7 +118,7 @@ func resolveAddSource(b *Build, source AddSource, options InstructionOptions) (l
 		if source.Value == "" {
 			return llb.State{}, "", fmt.Errorf("local source path cannot be empty")
 		}
-		return b.BuildContext, rootPath(b.expand(source.Value)), nil
+		return b.BuildContext, rootPath(source.Value), nil
 	case AddRemote:
 		if source.Value == "" {
 			return llb.State{}, "", fmt.Errorf("remote URL cannot be empty")
