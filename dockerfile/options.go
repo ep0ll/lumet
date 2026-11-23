@@ -25,7 +25,9 @@ type InstructionOptions struct {
 	RunOptions   []llb.RunOption
 	CopyOptions  []llb.CopyOption
 	Constraints  []llb.ConstraintsOpt
-	CustomName   string
+	CustomName    string
+	ProgressGroup string
+	ProgressTitle string
 
 	From      string
 	FromState *llb.State
@@ -95,6 +97,18 @@ func LLBConstraints(opts ...llb.ConstraintsOpt) Option {
 // CustomName sets the BuildKit progress name for an LLB operation.
 func CustomName(name string) Option {
 	return func(o *InstructionOptions) { o.CustomName = name }
+}
+
+// ProgressGroup sets the logical progress group for instructions that expose
+// their operation metadata to a progress-aware adapter.
+func ProgressGroup(name string) Option {
+	return func(o *InstructionOptions) { o.ProgressGroup = name }
+}
+
+// ProgressTitle sets a user-facing progress title for instructions that expose
+// their operation metadata to a progress-aware adapter.
+func ProgressTitle(title string) Option {
+	return func(o *InstructionOptions) { o.ProgressTitle = title }
 }
 
 // CopyFrom selects a named stage or named context as the source for COPY.
