@@ -58,6 +58,11 @@ func From(reference string, opts ...Option) Instruction {
 		if ref == "" && options.BaseState == nil {
 			return fmt.Errorf("FROM: image reference cannot be empty")
 		}
+		if options.StageName != "" {
+			if _, exists := b.lookupStage(options.StageName); exists {
+				return fmt.Errorf("FROM: duplicate stage name %q", options.StageName)
+			}
+		}
 		platform := clonePlatform(b.Platform)
 		if options.Platform != nil {
 			platform = clonePlatform(*options.Platform)
@@ -73,7 +78,7 @@ func From(reference string, opts ...Option) Instruction {
 		case strings.EqualFold(ref, "scratch"):
 			state = llb.Scratch()
 		default:
-			if stage, ok := b.stages[ref]; ok {
+			if stage, ok := b.lookupStage(ref); ok {
 				state = stage.State
 				image = cloneImage(stage.Image)
 				if options.Platform == nil {
@@ -105,7 +110,7 @@ func From(reference string, opts ...Option) Instruction {
 		image.Architecture = platform.Architecture
 		image.Variant = platform.Variant
 		image.OSVersion = platform.OSVersion
-		image.OSFeatures = append(image.OSFeatures[:0], platform.OSFeatures...)
+		image.OSFeatures = append([]string(nil), platform.OSFeatures...)
 
 		state = state.Platform(platform)
 		if image.Config.User != "" {
