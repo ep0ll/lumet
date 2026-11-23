@@ -228,6 +228,19 @@ func (v *StateValue) stateMetaAttr(name string) (starlark.Value, bool, error) {
 			if ip == nil { return nil, fmt.Errorf("State.AddExtraHost: invalid IP address %q", rawIP) }
 			return WrapState(state.AddExtraHost(host, ip)), nil
 		}), true, nil
+	case "Requires", "requires":
+		return boundBuiltin("State.Requires", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.Requires", args, kwargs, 1, -1); err != nil { return nil, err }
+			id, err := stringAt("State.Requires", args, 0)
+			if err != nil { return nil, err }
+			dependencies := make([]buildkitllb.State, 0, len(args)-1)
+			for i := 1; i < len(args); i++ {
+				dependency, err := stateFromValue(args[i])
+				if err != nil { return nil, fmt.Errorf("State.Requires dependency %d: %w", i, err) }
+				dependencies = append(dependencies, dependency)
+			}
+			return WrapState(state.Requires(id, dependencies...)), nil
+		}), true, nil
 	case "AddUlimit", "add_ulimit":
 		return boundBuiltin("State.AddUlimit", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 			if err := arity("State.AddUlimit", args, kwargs, 3, 3); err != nil { return nil, err }
@@ -318,10 +331,10 @@ func (v *StateValue) stateMetaAttr(name string) (starlark.Value, bool, error) {
 var stateMetaAttrNames = []string{
 	"AddEnv", "AddEnvf", "AddExtraHost", "AddUlimit", "DelEnv", "Dir", "Dirf",
 	"Env", "GetArgs", "GetDir", "GetEnv", "GetHostname", "GetNetwork", "GetPlatform", "GetSecurity",
-	"Hostname", "Network", "Platform", "Reset", "Security", "User", "With", "WithCgroupParent",
+	"Hostname", "Network", "Platform", "Reset", "Requires", "Security", "User", "With", "WithCgroupParent",
 	"add_env", "add_envf", "add_extra_host", "add_ulimit", "del_env", "dir", "dirf", "env",
 	"get_args", "get_dir", "get_env", "get_hostname", "get_network", "get_platform", "get_security",
-	"hostname", "network", "platform", "reset", "security", "user", "with", "with_cgroup_parent",
+	"hostname", "network", "platform", "reset", "requires", "security", "user", "with", "with_cgroup_parent",
 }
 
 func stateMetaAttr(v *StateValue, name string) (starlark.Value, bool, error) {
