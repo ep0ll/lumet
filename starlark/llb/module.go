@@ -29,7 +29,6 @@ func newModule() *starlarkstruct.Module {
 		definitionBuiltins,
 		marshalBuiltins,
 		sourceMapBuiltins,
-		asyncBuiltins,
 	}
 	for _, group := range groups {
 		for name, value := range group() {
