@@ -49,7 +49,7 @@ func (v *ExecStateValue) Unwrap() buildkitllb.ExecState {
 func (v *ExecStateValue) String() string        { return "<llb.ExecState>" }
 func (v *ExecStateValue) Type() string          { return "llb.ExecState" }
 func (v *ExecStateValue) Freeze()               {}
-func (v *ExecStateValue) Truth() starlark.Bool  { return v != nil }
+func (v *ExecStateValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
 func (v *ExecStateValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.ExecState") }
 
 // FileActionValue represents a BuildKit file operation. File actions are
@@ -136,3 +136,51 @@ func optionsFromArgs[T any](args starlark.Tuple, start int, want string) ([]T, e
 	}
 	return options, nil
 }
+
+
+// DefinitionValue is a marshalled BuildKit LLB definition. It is suitable for
+// passing to the native BuildKit client after the Starlark program completes.
+type DefinitionValue struct {
+	definition *buildkitllb.Definition
+}
+
+// Unwrap returns the native BuildKit definition.
+func (v *DefinitionValue) Unwrap() *buildkitllb.Definition {
+	if v == nil {
+		return nil
+	}
+	return v.definition
+}
+
+func (v *DefinitionValue) String() string        { return "<llb.Definition>" }
+func (v *DefinitionValue) Type() string          { return "llb.Definition" }
+func (v *DefinitionValue) Freeze()               {}
+func (v *DefinitionValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.definition != nil) }
+func (v *DefinitionValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.Definition") }
+
+func (v *DefinitionValue) Attr(name string) (starlark.Value, error) {
+	if v == nil || v.definition == nil {
+		return nil, fmt.Errorf("llb.Definition: nil receiver")
+	}
+	switch name {
+	case "Head", "head":
+		return boundBuiltin("Definition.Head", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("Definition.Head", args, kwargs, 0, 0); err != nil {
+				return nil, err
+			}
+			head, err := v.definition.Head()
+			if err != nil {
+				return nil, err
+			}
+			return starlark.String(head.String()), nil
+		}), nil
+	default:
+		return nil, nil
+	}
+}
+
+func (v *DefinitionValue) AttrNames() []string {
+	return []string{"Head", "head"}
+}
+
+var _ starlark.HasAttrs = (*DefinitionValue)(nil)
