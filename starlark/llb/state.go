@@ -325,6 +325,21 @@ func (v *StateValue) Attr(name string) (starlark.Value, error) {
 	}
 	state := v.state
 	switch name {
+	case "Marshal", "marshal":
+		return boundBuiltin("State.Marshal", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.Marshal", args, kwargs, 0, -1); err != nil {
+				return nil, err
+			}
+			opts, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+			if err != nil {
+				return nil, err
+			}
+			def, err := state.Marshal(callContext(thread), opts...)
+			if err != nil {
+				return nil, err
+			}
+			return &DefinitionValue{definition: def}, nil
+		}), nil
 	case "Run", "run":
 		return boundBuiltin("State.Run", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 			if err := arity("State.Run", args, kwargs, 0, -1); err != nil { return nil, err }
@@ -447,12 +462,12 @@ func (v *StateValue) Attr(name string) (starlark.Value, error) {
 
 func (v *StateValue) AttrNames() []string {
 	names := []string{
-		"AddEnv", "AddEnvf", "AddExtraHost", "AddUlimit", "DelEnv",
+		"AddEnv", "AddEnvf", "AddExtraHost", "AddUlimit", "DelEnv", "Marshal",
 		"Dir", "Dirf", "File", "Hostname", "Network", "Platform",
 		"Requires", "Reset", "Run", "Security", "User", "With",
 		"WithCgroupParent", "add_env", "add_envf", "add_extra_host",
 		"add_ulimit", "del_env", "dir", "dirf", "file", "hostname",
-		"network", "platform", "requires", "reset", "run", "security",
+		"marshal", "network", "platform", "requires", "reset", "run", "security",
 		"user", "with", "with_cgroup_parent",
 	}
 	sort.Strings(names)
