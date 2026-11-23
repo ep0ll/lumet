@@ -225,6 +225,7 @@ func (b *Build) Apply(ctx context.Context, instructions ...Instruction) error {
 		b.progressGroup, b.progressTitle = "", ""
 		if name == "From" {
 			stageIndex++
+			b.stageIndex = stageIndex
 		}
 		started := time.Now()
 		event := b.progressEvent(progress.Started, name, index+1, len(instructions), stageIndex, stageTotal, started, nil)
