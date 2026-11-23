@@ -175,3 +175,21 @@ func ExecWithGateway(ctx context.Context, gatewayClient gwclient.Client, filenam
 	fileOptions := options.FileOptions
 	return starlark.ExecFileOptions(&fileOptions, thread, filename, src, predeclared)
 }
+
+
+// BuildFunc creates a BuildKit gateway BuildFunc from a Starlark source file.
+// Each BuildKit invocation receives its own gateway/client module and thread;
+// the file must define build(gateway) and return a gateway.client.result.
+func BuildFunc(filename string, src any, options ExecOptions) gwclient.BuildFunc {
+	return func(ctx context.Context, gatewayClient gwclient.Client) (*gwclient.Result, error) {
+		globals, err := ExecWithGateway(ctx, gatewayClient, filename, src, nil, options)
+		if err != nil {
+			return nil, err
+		}
+		build, ok := globals["build"].(starlark.Callable)
+		if !ok {
+			return nil, fmt.Errorf("%s: expected a Starlark build(gateway) function", filename)
+		}
+		return starlarkgatewayclient.BuildCallback(build)(ctx, gatewayClient)
+	}
+}
