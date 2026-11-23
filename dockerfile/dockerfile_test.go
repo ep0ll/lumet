@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/moby/buildkit/client/llb"
+	"github.com/ep0ll/lumet/dockerfile/progress"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -361,4 +362,60 @@ func TestEntrypointClearsInheritedCmdUnlessCurrentStageSetsOne(t *testing.T) {
 	if len(build.Image.Config.Cmd) != 1 || build.Image.Config.Cmd[0] != "default-arg" {
 		t.Fatalf("ENTRYPOINT should preserve a CMD declared in this stage: %#v", build.Image.Config.Cmd)
 	}
+}
+
+
+func TestProgressEventsContainInstructionAndStageMetadata(t *testing.T) {
+	var events []progress.Event
+	reporter := progress.ReporterFunc(func(_ context.Context, event progress.Event) error {
+		events = append(events, event)
+		return nil
+	})
+	platform := ocispecs.Platform{OS: "linux", Architecture: "arm64", Variant: "v8"}
+	build := New(WithPlatform(platform), WithProgressReporter(reporter))
+	if err := build.Apply(context.Background(),
+		From("scratch", As("builder")),
+		Run(Exec("true"), ProgressGroup("compile"), ProgressTitle("Compile application")),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 4 {
+		t.Fatalf("expected start/completion for two instructions, got %d", len(events))
+	}
+	runDone := events[3]
+	if runDone.Phase != progress.Completed || runDone.Instruction != "Run" {
+		t.Fatalf("unexpected RUN completion event: %#v", runDone)
+	}
+	if runDone.InstructionIndex != 2 || runDone.InstructionTotal != 2 {
+		t.Fatalf("unexpected instruction position: %#v", runDone)
+	}
+	if runDone.StageName != "builder" || runDone.StageIndex != 1 || runDone.StageTotal != 1 {
+		t.Fatalf("unexpected stage metadata: %#v", runDone)
+	}
+	if runDone.Platform.OS != "linux" || runDone.Platform.Architecture != "arm64" || runDone.Platform.Variant != "v8" {
+		t.Fatalf("unexpected platform metadata: %#v", runDone.Platform)
+	}
+	if runDone.Group != "compile" || runDone.Message != "builder: Compile application" {
+		t.Fatalf("instruction progress options were not applied: %#v", runDone)
+	}
+	if events[0].Phase != progress.Started || !events[0].FinishedAt.IsZero() {
+		t.Fatalf("started event should not have a finish timestamp: %#v", events[0])
+	}
+}
+
+func TestBuildEscapeTokenIsConfigurable(t *testing.T) {
+	build := New(WithEscapeToken(rune(96)))
+	literal := string(rune(96)) + "$PATH"
+	if err := build.Apply(context.Background(),
+		From("scratch"),
+		Env(KV("PATH", "/usr/bin"), KV("LITERAL", literal)),
+	); err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range build.Image.Config.Env {
+		if entry == "LITERAL=$PATH" {
+			return
+		}
+	}
+	t.Fatalf("backtick escape was not honored: %#v", build.Image.Config.Env)
 }
