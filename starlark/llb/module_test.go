@@ -138,3 +138,40 @@ func TestExecOptionsEnforceStepBudget(t *testing.T) {
 		t.Fatal("ExecWithOptions() succeeded despite a one-step execution budget")
 	}
 }
+
+
+func TestStateAndConstraintOptions(t *testing.T) {
+	t.Parallel()
+
+	globals, err := Exec(
+		context.Background(),
+		"constraints.star",
+		`
+load("llb", "Scratch", "Reset", "AddEnv", "WithLinuxResources", "WithCustomNamef")
+
+state = Scratch().with(Reset(Scratch()), AddEnv("MODE", "test"))
+definition = state.marshal(
+    WithLinuxResources(memory = 1073741824, cpu_shares = 512),
+    WithCustomNamef("stage-%s", "test"),
+)
+`,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("Exec() error = %v", err)
+	}
+	state, ok := globals["state"].(*StateValue)
+	if !ok {
+		t.Fatalf("state global has type %T, want *StateValue", globals["state"])
+	}
+	definition, err := state.Unwrap().Marshal(context.Background())
+	if err != nil {
+		t.Fatalf("State.Marshal() error = %v", err)
+	}
+	if len(definition.Def) == 0 {
+		t.Fatal("State.Marshal() returned an empty definition")
+	}
+	if _, ok := globals["definition"].(*DefinitionValue); !ok {
+		t.Fatalf("definition global has type %T, want *DefinitionValue", globals["definition"])
+	}
+}
