@@ -20,6 +20,9 @@ func optionBuiltins() map[string]starlark.Value {
 			name, err := stringAt("WithCustomName", a, 0); if err != nil { return nil, err }
 			return buildkitllb.WithCustomName(name), nil
 		}, 1, 1, "ConstraintsOpt"),
+		"WithCustomNamef": optionBuiltin("WithCustomNamef", customNamefOption, 1, -1, "ConstraintsOpt"),
+		"WithLinuxResources": builtin("WithLinuxResources", withLinuxResourcesBuiltin),
+		"Reset": optionBuiltin("Reset", resetOption, 1, 1, "StateOption"),
 		"WithExportCache": optionBuiltin("WithExportCache", func(a starlark.Tuple) (any, error) { return buildkitllb.WithExportCache(), nil }, 0, 0, "ConstraintsOpt"),
 		"WithoutExportCache": optionBuiltin("WithoutExportCache", func(a starlark.Tuple) (any, error) { return buildkitllb.WithoutExportCache(), nil }, 0, 0, "ConstraintsOpt"),
 		"WithoutDefaultExportCache": optionBuiltin("WithoutDefaultExportCache", func(a starlark.Tuple) (any, error) { return buildkitllb.WithoutDefaultExportCache(), nil }, 0, 0, "ConstraintsOpt"),
@@ -450,4 +453,37 @@ func verifyPGPSignatureOption(args starlark.Tuple) (any, error) {
 		PubKey: pubKey,
 		Signature: signature,
 	}), nil
+}
+
+
+func customNamefOption(args starlark.Tuple) (any, error) {
+	format, err := stringAt("WithCustomNamef", args, 0)
+	if err != nil { return nil, err }
+	values := make([]any, 0, len(args)-1)
+	for _, arg := range args[1:] {
+		values = append(values, goScalar(arg))
+	}
+	return buildkitllb.WithCustomNamef(format, values...), nil
+}
+
+func resetOption(args starlark.Tuple) (any, error) {
+	state, err := stateFromValue(args[0])
+	if err != nil { return nil, err }
+	return buildkitllb.Reset(state), nil
+}
+
+func withLinuxResourcesBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var resources buildkitllb.LinuxResources
+	if err := starlark.UnpackArgs("WithLinuxResources", args, kwargs,
+		"memory?", &resources.Memory,
+		"memory_swap?", &resources.MemorySwap,
+		"cpu_shares?", &resources.CPUShares,
+		"cpu_period?", &resources.CPUPeriod,
+		"cpu_quota?", &resources.CPUQuota,
+		"cpuset_cpus?", &resources.CpusetCpus,
+		"cpuset_mems?", &resources.CpusetMems,
+	); err != nil {
+		return nil, err
+	}
+	return &optionValue{kind: "ConstraintsOpt", value: buildkitllb.WithLinuxResources(resources)}, nil
 }
