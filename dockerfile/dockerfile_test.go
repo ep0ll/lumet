@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/moby/buildkit/client/llb"
+	"github.com/ep0ll/lumet/dockerfile/expand"
 	"github.com/ep0ll/lumet/dockerfile/progress"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -418,4 +419,30 @@ func TestBuildEscapeTokenIsConfigurable(t *testing.T) {
 		}
 	}
 	t.Fatalf("backtick escape was not honored: %#v", build.Image.Config.Env)
+}
+
+
+func TestVariableExpanderCanBeReplaced(t *testing.T) {
+	called := false
+	expander := VariableExpanderFunc(func(input string, lookup expand.Lookup, config expand.Config) (string, error) {
+		called = true
+		if value, ok := lookup("BASE"); !ok || value != "/base" {
+			t.Fatalf("expander received wrong lookup: %q %v", value, ok)
+		}
+		return "custom:" + input, nil
+	})
+	build := New(WithVariableExpander(expander))
+	if err := build.Apply(context.Background(),
+		From("scratch"),
+		Env(KV("BASE", "/base")),
+		Env(KV("VALUE", "$BASE")),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("custom variable expander was not called")
+	}
+	if got := build.Image.Config.Env[len(build.Image.Config.Env)-1]; got != "VALUE=custom:$BASE" {
+		t.Fatalf("custom expander result was not used: %q", got)
+	}
 }
