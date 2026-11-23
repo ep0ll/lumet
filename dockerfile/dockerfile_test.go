@@ -4,6 +4,7 @@ import (
 	"context"
 	"syscall"
 	"testing"
+	"strings"
 	"time"
 
 	"github.com/moby/buildkit/client/llb"
@@ -248,5 +249,63 @@ func TestArgScopeAcrossStages(t *testing.T) {
 		t.Fatal(err)
 	} else if !ok || value != "visible" {
 		t.Fatalf("ENV should survive FROM from a previous stage: value=%q present=%v", value, ok)
+	}
+}
+
+
+func TestEnvInstructionExpandsAgainstPreviousEnvironment(t *testing.T) {
+	build := New()
+	err := build.Apply(context.Background(),
+		From("scratch"),
+		Env(
+			KV("FIRST", "one"),
+			KV("SECOND", "$FIRST"),
+		),
+		Env(KV("THIRD", "$FIRST")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	values := make(map[string]string)
+	for _, entry := range build.Image.Config.Env {
+		key, value, ok := strings.Cut(entry, "=")
+		if ok {
+			values[key] = value
+		}
+	}
+	if values["FIRST"] != "one" {
+		t.Fatalf("unexpected FIRST: %q", values["FIRST"])
+	}
+	if values["SECOND"] != "" {
+		t.Fatalf("same-instruction variables should not see sibling assignments: %q", values["SECOND"])
+	}
+	if values["THIRD"] != "one" {
+		t.Fatalf("subsequent ENV should see prior assignments: %q", values["THIRD"])
+	}
+}
+
+func TestArgOverridesBaseImageEnvironment(t *testing.T) {
+	ctx := context.Background()
+	platform := ocispecs.Platform{OS: "linux", Architecture: "amd64"}
+	build := New(
+		WithPlatform(platform),
+		WithBuildArgs(map[string]string{"PATH": "/custom/bin"}),
+		WithImageResolver(func(_ context.Context, _ string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
+			image := emptyImage(platform)
+			image.Config.Env = []string{"PATH=/usr/bin"}
+			return image, nil
+		}),
+	)
+	err := build.Apply(ctx,
+		From("example/base:latest"),
+		Arg("PATH"),
+		Env(KV("PATH", "$PATH")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := build.Image.Config.Env[0]; got != "PATH=/custom/bin" {
+		t.Fatalf("ARG should replace inherited base image environment until ENV overrides it: %q", got)
 	}
 }
