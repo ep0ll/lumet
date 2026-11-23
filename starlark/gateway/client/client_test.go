@@ -152,4 +152,14 @@ source := strings.Join([]string{
 	if gateway.resolveOptions.ImageOpt == nil || gateway.resolveOptions.ImageOpt.ResolveMode != "pull" {
 		t.Fatalf("ResolveImageConfig received options %+v; want resolve mode pull", gateway.resolveOptions)
 	}
+
+	gateway2 := &fakeGateway{}
+	buildFunc := modules.BuildFunc("gateway_build.star", source, modules.ExecOptions{})
+	built, err := buildFunc(ctx, gateway2)
+	if err != nil {
+		t.Fatalf("modules.BuildFunc() error: %v", err)
+	}
+	if built == nil || !built.IsEmpty() || gateway2.solveCalls != 1 {
+		t.Fatalf("modules.BuildFunc() result=%v solve_calls=%d", built, gateway2.solveCalls)
+	}
 }
