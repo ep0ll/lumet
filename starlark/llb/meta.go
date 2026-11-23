@@ -483,3 +483,19 @@ func stateStringPairMethod(name string, fn func(string, string) buildkitllb.Stat
 		return WrapState(fn(key, value)), nil
 	})
 }
+
+
+func newOpMetadataBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if len(kwargs) != 0 || len(args) > 1 {
+		return nil, fmt.Errorf("NewOpMetadata: expected zero or one llb.OpMetadataPB argument")
+	}
+	var native *pb.OpMetadata
+	if len(args) == 1 && args[0] != starlark.None {
+		value, ok := args[0].(*OpMetadataProtoValue)
+		if !ok || value == nil {
+			return nil, fmt.Errorf("NewOpMetadata: got %s, want llb.OpMetadataPB or None", valueType(args[0]))
+		}
+		native = value.metadata
+	}
+	return WrapOpMetadata(buildkitllb.NewOpMetadata(native)), nil
+}
