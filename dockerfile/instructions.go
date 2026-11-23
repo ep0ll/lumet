@@ -132,6 +132,7 @@ func From(reference string, opts ...Option) Instruction {
 		b.stageArgs = inheritedArgs
 		b.stageEnv = inheritedEnv
 		b.stageName = options.StageName
+		b.cmdSet = false
 		b.started = true
 		return nil
 	}
@@ -257,6 +258,7 @@ func Cmd(command Command) Instruction {
 			return fmt.Errorf("CMD: %w", err)
 		}
 		b.Image.Config.Cmd = args
+		b.cmdSet = true
 		return b.recordHistory(ctx, "CMD "+formatCommand(command), true)
 	}
 }
@@ -272,6 +274,9 @@ func Entrypoint(command Command) Instruction {
 			return fmt.Errorf("ENTRYPOINT: %w", err)
 		}
 		b.Image.Config.Entrypoint = args
+		if !b.cmdSet {
+			b.Image.Config.Cmd = nil
+		}
 		return b.recordHistory(ctx, "ENTRYPOINT "+formatCommand(command), true)
 	}
 }
@@ -282,8 +287,8 @@ func Shell(args ...string) Instruction {
 		if err := b.requireStage("SHELL"); err != nil {
 			return err
 		}
-		if len(args) == 0 {
-			return fmt.Errorf("SHELL: at least one executable argument is required")
+		if len(args) == 0 || strings.TrimSpace(args[0]) == "" {
+			return fmt.Errorf("SHELL: a non-empty executable argument is required")
 		}
 		b.Image.Config.Shell = append([]string(nil), args...)
 		return b.recordHistory(ctx, "SHELL "+strings.Join(args, " "), true)
