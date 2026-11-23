@@ -111,8 +111,8 @@ func New(opts ...BuildOption) *Build {
 // WithPlatform sets the target platform for the build.
 func WithPlatform(platform ocispecs.Platform) BuildOption {
 	return func(b *Build) {
-		b.Platform = platform
-		b.State = b.State.Platform(platform)
+		b.Platform = clonePlatform(platform)
+		b.State = b.State.Platform(b.Platform)
 	}
 }
 
@@ -156,8 +156,8 @@ func WithHistoryRecorder(recorder HistoryRecorder) BuildOption {
 	return func(b *Build) { b.HistoryRecorder = recorder }
 }
 
-// WithConstraints adds LLB constraints to file operations created by
-// instructions, including COPY, ADD and WORKDIR.
+// WithConstraints adds LLB constraints to operations created by instructions,
+// including RUN, COPY, ADD and WORKDIR.
 func WithConstraints(opts ...llb.ConstraintsOpt) BuildOption {
 	return func(b *Build) { b.constraints = append(b.constraints, opts...) }
 }
@@ -168,6 +168,9 @@ func (b *Build) Apply(ctx context.Context, instructions ...Instruction) error {
 		return fmt.Errorf("dockerfile: nil build")
 	}
 	for index, instruction := range instructions {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("dockerfile: instruction %d: %w", index+1, err)
+		}
 		if instruction == nil {
 			return fmt.Errorf("dockerfile: instruction %d is nil", index)
 		}
@@ -180,6 +183,9 @@ func (b *Build) Apply(ctx context.Context, instructions ...Instruction) error {
 
 // Result returns a detached snapshot of the current state, image and named stages.
 func (b *Build) Result() Result {
+	if b == nil {
+		return Result{}
+	}
 	stages := make(map[string]Stage, len(b.stages)+1)
 	for name, stage := range b.stages {
 		stages[name] = cloneStage(stage)
@@ -196,6 +202,9 @@ func (b *Build) Result() Result {
 // Stage returns a previously completed stage, or the current stage when its
 // name matches the requested name.
 func (b *Build) Stage(name string) (Stage, bool) {
+	if b == nil {
+		return Stage{}, false
+	}
 	if b.started && strings.EqualFold(name, b.stageName) && b.stageName != "" {
 		return cloneStage(b.currentStage()), true
 	}
