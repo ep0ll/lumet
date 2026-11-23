@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -19,6 +20,9 @@ import (
 	"github.com/moby/buildkit/client/llb"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/ep0ll/lumet/dockerfile/expand"
+	"github.com/ep0ll/lumet/dockerfile/progress"
 )
 
 // Instruction is a build step. Constructors such as From, Run and Copy return
@@ -47,12 +51,15 @@ type Build struct {
 
 	ImageResolver   ImageResolver
 	HistoryRecorder HistoryRecorder
+	ProgressReporter progress.Reporter
+	EscapeToken      rune
 
 	namedContexts map[string]llb.State
 	stages        map[string]Stage
 	stageName     string
 	started       bool
 	cmdSet        bool
+	stageIndex    int
 	createdAt     *time.Time
 	constraints   []llb.ConstraintsOpt
 	globalArgs    map[string]string
@@ -152,6 +159,17 @@ func WithCreatedAt(t time.Time) BuildOption {
 	}
 }
 
+// WithProgressReporter installs a UI-agnostic observer for instruction lifecycle events.
+func WithProgressReporter(reporter progress.Reporter) BuildOption {
+	return func(b *Build) { b.ProgressReporter = reporter }
+}
+
+// WithEscapeToken configures the source-format escape rune used when expanding
+// variables. Dockerfile's default is backslash; a syntax directive may select backtick.
+func WithEscapeToken(token rune) BuildOption {
+	return func(b *Build) { b.EscapeToken = token }
+}
+
 // WithHistoryRecorder installs a callback invoked for each history entry.
 func WithHistoryRecorder(recorder HistoryRecorder) BuildOption {
 	return func(b *Build) { b.HistoryRecorder = recorder }
@@ -163,23 +181,87 @@ func WithConstraints(opts ...llb.ConstraintsOpt) BuildOption {
 	return func(b *Build) { b.constraints = append(b.constraints, opts...) }
 }
 
-// Apply executes instructions sequentially. The first error stops the build.
+// Apply executes instructions sequentially and reports lifecycle events.
+// Instruction and stage totals are scoped to this Apply call.
 func (b *Build) Apply(ctx context.Context, instructions ...Instruction) error {
 	if b == nil {
 		return fmt.Errorf("dockerfile: nil build")
 	}
+	stageTotal := 0
+	for _, instruction := range instructions {
+		if instruction != nil && instructionName(instruction) == "From" {
+			stageTotal++
+		}
+	}
+	stageIndex := b.stageIndex
 	for index, instruction := range instructions {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("dockerfile: instruction %d: %w", index+1, err)
 		}
 		if instruction == nil {
-			return fmt.Errorf("dockerfile: instruction %d is nil", index)
+			return fmt.Errorf("dockerfile: instruction %d is nil", index+1)
+		}
+		name := instructionName(instruction)
+		if name == "From" {
+			stageIndex++
+		}
+		started := time.Now()
+		event := b.progressEvent(progress.Started, name, index+1, len(instructions), stageIndex, stageTotal, started, nil)
+		if err := b.reportProgress(ctx, event); err != nil {
+			return fmt.Errorf("dockerfile: progress start for instruction %d: %w", index+1, err)
 		}
 		if err := instruction(ctx, b); err != nil {
-			return fmt.Errorf("dockerfile: instruction %d: %w", index+1, err)
+			failed := b.progressEvent(progress.Failed, name, index+1, len(instructions), stageIndex, stageTotal, started, err)
+			_ = b.reportProgress(ctx, failed)
+			return fmt.Errorf("dockerfile: instruction %d (%s): %w", index+1, name, err)
+		}
+		completed := b.progressEvent(progress.Completed, name, index+1, len(instructions), stageIndex, stageTotal, started, nil)
+		if err := b.reportProgress(ctx, completed); err != nil {
+			return fmt.Errorf("dockerfile: progress completion for instruction %d: %w", index+1, err)
 		}
 	}
+	b.stageIndex = stageIndex
 	return nil
+}
+
+func instructionName(instruction Instruction) string {
+	fn := runtime.FuncForPC(reflect.ValueOf(instruction).Pointer())
+	if fn == nil {
+		return "instruction"
+	}
+	name := fn.Name()
+	if at := strings.LastIndex(name, ".func"); at >= 0 {
+		name = name[:at]
+	}
+	if at := strings.LastIndex(name, "."); at >= 0 {
+		name = name[at+1:]
+	}
+	return name
+}
+
+func (b *Build) progressEvent(phase progress.Phase, instruction string, index, total, stageIndex, stageTotal int, started time.Time, err error) progress.Event {
+	group := b.stageName
+	if group == "" {
+		group = "build"
+	}
+	message := instruction
+	if b.stageName != "" {
+		message = b.stageName + ": " + instruction
+	}
+	return progress.Event{
+		Phase: phase, Group: group, Message: message, Instruction: instruction,
+		InstructionIndex: index, InstructionTotal: total, StageName: b.stageName,
+		StageIndex: stageIndex, StageTotal: stageTotal, Platform: clonePlatform(b.Platform),
+		PlatformSpecified: b.Platform.OS != "" && b.Platform.Architecture != "",
+		StartedAt: started, FinishedAt: time.Now(), Err: err,
+	}
+}
+
+func (b *Build) reportProgress(ctx context.Context, event progress.Event) error {
+	if b.ProgressReporter == nil {
+		return nil
+	}
+	return b.ProgressReporter.Report(ctx, event)
 }
 
 // Result returns a detached snapshot of the current state, image and named stages.
@@ -254,11 +336,11 @@ func (b *Build) requireStage(instruction string) error {
 }
 
 func (b *Build) expand(value string) string {
-	return expandVariables(value, b.stageEnv, nil)
+	return expandVariablesWithEscape(value, b.stageEnv, b.EscapeToken)
 }
 
 func (b *Build) expandGlobal(value string) string {
-	return expandVariables(value, b.globalArgs, nil)
+	return expandVariablesWithEscape(value, b.globalArgs, b.EscapeToken)
 }
 
 func (b *Build) recordHistory(ctx context.Context, createdBy string, emptyLayer bool) error {
