@@ -14,6 +14,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1
+	go.starlark.net v0.0.0-20261021141710-4f4267fb140d
 	github.com/tonistiigi/go-csvvalue v0.0.0-20240814133006-030d3b2625d0
 	golang.org/x/sync v0.24.0
 )
