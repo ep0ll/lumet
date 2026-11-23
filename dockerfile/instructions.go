@@ -498,14 +498,14 @@ func setEnv(env []string, key, value string) []string {
 
 func expandVariables(value string, args map[string]string, env []string) string {
 	environment := make(map[string]string, len(args)+len(env))
+	for key, current := range args {
+		environment[key] = current
+	}
 	for _, item := range env {
 		key, current, found := strings.Cut(item, "=")
 		if found {
 			environment[key] = current
 		}
-	}
-	for key, current := range args {
-		environment[key] = current
 	}
 	return os.Expand(value, func(key string) string {
 		return environment[key]
