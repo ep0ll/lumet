@@ -69,7 +69,16 @@ func optionBuiltins() map[string]starlark.Value {
 		"MountSSHSock": stringOption("MountSSHSock", "GitOption", buildkitllb.MountSSHSock),
 		"GitChecksum": stringOption("GitChecksum", "GitOption", buildkitllb.GitChecksum),
 		"GitFetchByCommit": optionBuiltin("GitFetchByCommit", func(starlark.Tuple) (any, error) { return buildkitllb.GitFetchByCommit(), nil }, 0, 0, "GitOption"),
-		"GitBundleURL": stringOption("GitBundleURL", "GitOption", buildkitllb.GitBundleURL),
+		"GitBundleURL": optionBuiltin("GitBundleURL", func(a starlark.Tuple) (any, error) {
+			locator, err := stringAt("GitBundleURL", a, 0); if err != nil { return nil, err }
+			opts, err := optionsFromArgs[buildkitllb.GitBundleOption](a, 1, "GitBundleOption"); if err != nil { return nil, err }
+			return buildkitllb.GitBundleURL(locator, opts...), nil
+		}, 1, -1, "GitOption"),
+		"GitBundleOCIStore": optionBuiltin("GitBundleOCIStore", func(a starlark.Tuple) (any, error) {
+			session, err := stringAt("GitBundleOCIStore", a, 0); if err != nil { return nil, err }
+			store, err := stringAt("GitBundleOCIStore", a, 1); if err != nil { return nil, err }
+			return buildkitllb.GitBundleOCIStore(session, store), nil
+		}, 2, 2, "GitBundleOption"),
 		"GitCheckoutBundle": optionBuiltin("GitCheckoutBundle", func(starlark.Tuple) (any, error) { return buildkitllb.GitCheckoutBundle(), nil }, 0, 0, "GitOption"),
 		"SessionID": stringOption("SessionID", "LocalOption", buildkitllb.SessionID),
 		"IncludePatterns": stringListOption("IncludePatterns", "LocalOption", buildkitllb.IncludePatterns),
@@ -93,11 +102,11 @@ func optionBuiltins() map[string]starlark.Value {
 			store, err := stringAt("ImageBlobOCIStore", a, 1); if err != nil { return nil, err }
 			return buildkitllb.ImageBlobOCIStore(session, store), nil
 		}, 2, 2, "ImageBlobOption"),
-		"HTTPChecksum": optionBuiltin("HTTPChecksum", func(a starlark.Tuple) (any, error) {
-			raw, err := stringAt("HTTPChecksum", a, 0); if err != nil { return nil, err }
-			d, err := digest.Parse(raw); if err != nil { return nil, fmt.Errorf("HTTPChecksum: %w", err) }
-			return buildkitllb.Checksum(d), nil
-		}, 1, 1, "HTTPOption"),
+		"Checksum": optionBuiltin("Checksum", checksumOption, 1, 1, "HTTPOption"),
+		"HTTPChecksum": optionBuiltin("HTTPChecksum", checksumOption, 1, 1, "HTTPOption"),
+		"WithImageChecksum": optionBuiltin("WithImageChecksum", imageChecksumOption, 1, 1, "ImageOption"),
+		"WithLayerLimit": intOption("WithLayerLimit", "ImageOption", buildkitllb.WithLayerLimit),
+		"ResolveDigest": boolOption("ResolveDigest", "ImageOption", buildkitllb.ResolveDigest),
 		"Filename": stringOption("Filename", "FileInfoOption", buildkitllb.Filename),
 		"Chmod": intOption("Chmod", "FileInfoOption", func(n int) buildkitllb.FileInfoOption { return buildkitllb.Chmod(os.FileMode(n)) }),
 		"Chown": optionBuiltin("Chown", func(a starlark.Tuple) (any, error) {
@@ -138,7 +147,11 @@ func optionBuiltins() map[string]starlark.Value {
 			return buildkitllb.Tmpfs(opts...), nil
 		}, 0, -1, "MountOption"),
 		"AddMount": optionBuiltin("AddMount", addMountOption, 2, -1, "RunOption"),
+		"AddExtraHost": optionBuiltin("AddExtraHost", addExtraHostOption, 2, 2, "RunOption"),
+		"AddCDIDevice": optionBuiltin("AddCDIDevice", addCDIDeviceOption, 0, -1, "RunOption"),
+		"CDIDeviceName": stringOption("CDIDeviceName", "CDIDeviceOption", buildkitllb.CDIDeviceName),
 		"AddSecret": optionBuiltin("AddSecret", addSecretOption, 1, -1, "RunOption"),
+		"AddSecretWithDest": optionBuiltin("AddSecretWithDest", addSecretWithDestOption, 2, -1, "RunOption"),
 		"AddSSHSocket": optionBuiltin("AddSSHSocket", func(a starlark.Tuple) (any, error) {
 			opts, err := optionsFromArgs[buildkitllb.SSHOption](a, 0, "SSHOption"); if err != nil { return nil, err }
 			return buildkitllb.AddSSHSocket(opts...), nil
@@ -161,6 +174,7 @@ func optionBuiltins() map[string]starlark.Value {
 			mode, err := intAt("SecretFileOpt", a, 2); if err != nil { return nil, err }
 			return buildkitllb.SecretFileOpt(uid, gid, mode), nil
 		}, 3, 3, "SecretOption"),
+		"WithProxy": optionBuiltin("WithProxy", withProxyOption, 1, 1, "RunOption"),
 		"With": optionBuiltin("With", func(a starlark.Tuple) (any, error) {
 			opts, err := optionsFromArgs[buildkitllb.StateOption](a, 0, "StateOption"); if err != nil { return nil, err }
 			return buildkitllb.With(opts...), nil
@@ -183,6 +197,8 @@ func optionBuiltins() map[string]starlark.Value {
 		"WithAllowNotFound": boolOption("WithAllowNotFound", "RmOption", buildkitllb.WithAllowNotFound),
 		"WithAllowWildcard": boolOption("WithAllowWildcard", "RmOption", buildkitllb.WithAllowWildcard),
 		"WithExcludePatterns": stringListOption("WithExcludePatterns", "CopyOption", buildkitllb.WithExcludePatterns),
+		"ChmodMode": intOption("ChmodMode", "CopyOption", func(n int) buildkitllb.CopyOption { return buildkitllb.ChmodOpt{Mode: os.FileMode(n)} }),
+		"ChmodSymbolic": stringOption("ChmodSymbolic", "CopyOption", func(s string) buildkitllb.CopyOption { return buildkitllb.ChmodOpt{ModeStr: s} }),
 		"CreatedTime": optionBuiltin("WithCreatedTime", func(a starlark.Tuple) (any, error) {
 			raw, err := stringAt("WithCreatedTime", a, 0); if err != nil { return nil, err }
 			t, err := time.Parse(time.RFC3339Nano, raw); if err != nil { return nil, fmt.Errorf("WithCreatedTime: %w", err) }
@@ -268,3 +284,52 @@ func addSecretOption(a starlark.Tuple) (any, error) {
 }
 
 var _ = digest.Digest("")
+
+
+func checksumOption(a starlark.Tuple) (any, error) {
+	raw, err := stringAt("Checksum", a, 0)
+	if err != nil { return nil, err }
+	d, err := digest.Parse(raw)
+	if err != nil { return nil, fmt.Errorf("Checksum: %w", err) }
+	return buildkitllb.Checksum(d), nil
+}
+
+func imageChecksumOption(a starlark.Tuple) (any, error) {
+	raw, err := stringAt("WithImageChecksum", a, 0)
+	if err != nil { return nil, err }
+	d, err := digest.Parse(raw)
+	if err != nil { return nil, fmt.Errorf("WithImageChecksum: %w", err) }
+	return buildkitllb.WithImageChecksum(d), nil
+}
+
+func addExtraHostOption(a starlark.Tuple) (any, error) {
+	host, err := stringAt("AddExtraHost", a, 0)
+	if err != nil { return nil, err }
+	ipText, err := stringAt("AddExtraHost", a, 1)
+	if err != nil { return nil, err }
+	ip := net.ParseIP(ipText)
+	if ip == nil { return nil, fmt.Errorf("AddExtraHost: invalid IP address %q", ipText) }
+	return buildkitllb.AddExtraHost(host, ip), nil
+}
+
+func addCDIDeviceOption(a starlark.Tuple) (any, error) {
+	opts, err := optionsFromArgs[buildkitllb.CDIDeviceOption](a, 0, "CDIDeviceOption")
+	if err != nil { return nil, err }
+	return buildkitllb.AddCDIDevice(opts...), nil
+}
+
+func addSecretWithDestOption(a starlark.Tuple) (any, error) {
+	src, err := stringAt("AddSecretWithDest", a, 0)
+	if err != nil { return nil, err }
+	target, err := stringAt("AddSecretWithDest", a, 1)
+	if err != nil { return nil, err }
+	opts, err := optionsFromArgs[buildkitllb.SecretOption](a, 2, "SecretOption")
+	if err != nil { return nil, err }
+	return buildkitllb.AddSecretWithDest(src, &target, opts...), nil
+}
+
+func withProxyOption(a starlark.Tuple) (any, error) {
+	proxy, ok := a[0].(*proxyEnvValue)
+	if !ok || proxy == nil { return nil, fmt.Errorf("WithProxy: got %s, want llb.ProxyEnv", valueType(a[0])) }
+	return buildkitllb.WithProxy(proxy.proxy), nil
+}
