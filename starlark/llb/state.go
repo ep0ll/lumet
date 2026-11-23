@@ -460,6 +460,7 @@ func stateBuiltins() map[string]starlark.Value {
 	members := map[string]starlark.Value{
 		"NewState": builtin("NewState", newStateBuiltin),
 		"NewConstraints": builtin("NewConstraints", newConstraintsBuiltin),
+		"NewOpMetadata": builtin("NewOpMetadata", newOpMetadataBuiltin),
 		"OCIPlatform": builtin("OCIPlatform", ociPlatformBuiltin),
 	}
 	for name, value := range stateConstraintBuiltins() {
