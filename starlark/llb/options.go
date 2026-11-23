@@ -2,6 +2,7 @@ package llb
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"time"
 
@@ -174,6 +175,7 @@ func optionBuiltins() map[string]starlark.Value {
 			mode, err := intAt("SecretFileOpt", a, 2); if err != nil { return nil, err }
 			return buildkitllb.SecretFileOpt(uid, gid, mode), nil
 		}, 3, 3, "SecretOption"),
+		"ProxyEnv": builtin("ProxyEnv", proxyEnvBuiltin),
 		"WithProxy": optionBuiltin("WithProxy", withProxyOption, 1, 1, "RunOption"),
 		"With": optionBuiltin("With", func(a starlark.Tuple) (any, error) {
 			opts, err := optionsFromArgs[buildkitllb.StateOption](a, 0, "StateOption"); if err != nil { return nil, err }
