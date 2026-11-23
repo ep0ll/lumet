@@ -64,20 +64,45 @@ func NewThread(ctx context.Context) *starlark.Thread {
 	return thread
 }
 
+// ExecOptions configures one Starlark evaluation.
+type ExecOptions struct {
+	// FileOptions controls syntax and resolver features. The zero value uses
+	// conservative Starlark defaults.
+	FileOptions syntax.FileOptions
+
+	// MaxSteps limits interpreter execution steps. Zero leaves the limit
+	// disabled; this does not impose a memory limit on the Starlark program.
+	MaxSteps uint64
+
+	// Print receives messages emitted by the Starlark print() builtin.
+	Print func(thread *starlark.Thread, message string)
+}
+
 // Exec evaluates src as a Starlark file with the LLB module loader installed.
 // predeclared may be nil. The returned globals are frozen by Starlark.
 func Exec(ctx context.Context, filename string, src any, predeclared starlark.StringDict) (starlark.StringDict, error) {
+	return ExecWithOptions(ctx, filename, src, predeclared, ExecOptions{})
+}
+
+// ExecWithOptions evaluates src using the requested syntax, execution and
+// output configuration. A context cancellation interrupts the interpreter.
+func ExecWithOptions(ctx context.Context, filename string, src any, predeclared starlark.StringDict, options ExecOptions) (starlark.StringDict, error) {
 	if predeclared == nil {
 		predeclared = starlark.StringDict{}
 	}
 	thread := NewThread(ctx)
+	thread.Print = options.Print
+	if options.MaxSteps > 0 {
+		thread.SetMaxExecutionSteps(options.MaxSteps)
+	}
 	if ctx != nil {
 		stop := context.AfterFunc(ctx, func() {
 			thread.Cancel("context cancelled")
 		})
 		defer stop()
 	}
-	return starlark.ExecFileOptions(&syntax.FileOptions{}, thread, filename, src, predeclared)
+	fileOptions := options.FileOptions
+	return starlark.ExecFileOptions(&fileOptions, thread, filename, src, predeclared)
 }
 
 // Predeclared returns a fresh dictionary containing the "llb" module.
