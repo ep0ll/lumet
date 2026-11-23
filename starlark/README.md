@@ -281,27 +281,24 @@ are unhashable because their identity is owned by the BuildKit solve.
 
 ### BuildKit callback integration
 
-The host can turn a Starlark callable into BuildKit's gateway/client.BuildFunc
-using gatewayclient.BuildCallback:
+The module package can compile a Starlark source file into a
+`gateway/client.BuildFunc` with `modules.BuildFunc`:
 
 ~~~go
-globals, err := modules.ExecWithGateway(
-    ctx, gatewayClient, "build.star", source, nil, modules.ExecOptions{},
-)
-if err != nil {
-    return nil, err
-}
-build, ok := globals["build"].(starlark.Callable)
-if !ok {
-    return nil, fmt.Errorf("build.star must define build(gateway)")
-}
-return gatewayclient.BuildCallback(build)(ctx, gatewayClient)
+build := modules.BuildFunc("build.star", source, modules.ExecOptions{})
+return build(ctx, gatewayClient)
 ~~~
 
-The callback receives a gateway.client.client value. Its context is attached
-to the Starlark thread, so context cancellation interrupts evaluation and
-gateway methods receive the same invocation context. The loaded client
-global is also bound to that same gateway instance.
+The file defines `build(gateway)`, receives the invocation-scoped
+`gateway.client.client` value, and returns a `gateway.client.result` produced
+by `gateway.solve()` or `new_result()`. The helper evaluates the source for
+each BuildKit invocation, so both the Starlark thread and dynamic module are
+bound to the active gateway client. Context cancellation interrupts execution
+and gateway methods receive the same invocation context.
+
+For applications that already have a compiled `starlark.Callable`,
+`gatewayclient.BuildCallback(callable)` is the lower-level adapter. `BuildFunc`
+is also re-exported as a Go alias to BuildKit's native callback type.
 
 ### Gateway API coverage and deliberate boundaries
 
