@@ -673,3 +673,26 @@ var (
 	_ starlark.Value    = (*secretInfoValue)(nil)
 	_ starlark.HasAttrs = (*secretInfoValue)(nil)
 )
+
+
+// cdiDeviceOptionValues groups CDI device option values separately from RUN
+// options and the other optional socket/secret flags.
+func cdiDeviceOptionValues() map[string]starlark.Value {
+	return map[string]starlark.Value{
+		"CDIDeviceOptional": wrapOption("CDIDeviceOption", buildkitllb.CDIDeviceOptional),
+	}
+}
+
+// sshOptionValues groups SSH socket option flags.
+func sshOptionValues() map[string]starlark.Value {
+	return map[string]starlark.Value{
+		"SSHOptional": wrapOption("SSHOption", buildkitllb.SSHOptional),
+	}
+}
+
+// secretOptionValues groups secret option flags.
+func secretOptionValues() map[string]starlark.Value {
+	return map[string]starlark.Value{
+		"SecretOptional": wrapOption("SecretOption", buildkitllb.SecretOptional),
+	}
+}
