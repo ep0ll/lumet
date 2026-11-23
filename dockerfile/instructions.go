@@ -3,8 +3,8 @@ package dockerfile
 import (
 	"context"
 	"encoding/json"
-	"maps"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"strconv"
