@@ -5,7 +5,6 @@ import (
 	"net/url"
 
 	buildkitllb "github.com/moby/buildkit/client/llb"
-	"github.com/opencontainers/go-digest"
 	"go.starlark.net/starlark"
 )
 
