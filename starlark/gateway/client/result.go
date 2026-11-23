@@ -79,7 +79,8 @@ func (v *ResultValue) Attr(name string) (starlark.Value, error) {
 			var key string
 			if err := starlark.UnpackArgs("result.find_ref", args, kwargs, "key", &key); err != nil { return nil, err }
 			ref, found := v.result.FindRef(key)
-			if !found || ref == nil { return starlark.Tuple{starlark.None, starlark.False}, nil }
+			if !found { return starlark.Tuple{starlark.None, starlark.False}, nil }
+			if ref == nil { return starlark.Tuple{starlark.None, starlark.True}, nil }
 			return starlark.Tuple{WrapReference(ref), starlark.True}, nil
 		}), nil
 	case "single_ref":
