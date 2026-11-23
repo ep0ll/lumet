@@ -28,6 +28,9 @@ func Run(command Command, opts ...Option) Instruction {
 		runOptions = append(runOptions, llb.Args(args))
 		name := options.CustomName
 		if name == "" {
+			name = options.ProgressTitle
+		}
+		if name == "" {
 			name = "RUN " + formatCommand(command)
 		}
 		runOptions = append(runOptions, llb.WithCustomName(name))
