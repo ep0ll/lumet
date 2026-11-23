@@ -23,7 +23,7 @@ func sourceBuiltins() map[string]starlark.Value {
 		"OCILayoutBlob": builtin("OCILayoutBlob", ociLayoutBlobBuiltin),
 		"Merge": builtin("Merge", mergeBuiltin),
 		"Diff": builtin("Diff", diffBuiltin),
-		"Platform": builtin("Platform", platformBuiltin),
+		"OCIPlatform": builtin("OCIPlatform", ociPlatformBuiltin),
 	}
 }
 
@@ -189,9 +189,9 @@ func diffBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, k
 	return WrapState(buildkitllb.Diff(lower, upper, opts...)), nil
 }
 
-func platformBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func ociPlatformBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var osName, architecture, variant, osVersion string
-	if err := starlark.UnpackArgs("Platform", args, kwargs,
+	if err := starlark.UnpackArgs("OCIPlatform", args, kwargs,
 		"os", &osName,
 		"architecture", &architecture,
 		"variant?", &variant,
@@ -393,7 +393,7 @@ func (v *StateValue) Attr(name string) (starlark.Value, error) {
 		return boundBuiltin("State.Platform", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 			if err := arity("State.Platform", args, kwargs, 1, 1); err != nil { return nil, err }
 			p, ok := args[0].(*platformValue)
-			if !ok { return nil, fmt.Errorf("State.Platform: got %s, want llb.Platform", valueType(args[0])) }
+			if !ok { return nil, fmt.Errorf("State.Platform: got %s, want llb.OCIPlatform", valueType(args[0])) }
 			return WrapState(state.Platform(p.platform)), nil
 		}), nil
 	case "Reset", "reset":
