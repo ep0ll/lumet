@@ -151,7 +151,7 @@ func mergeBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, 
 	if err := arity("Merge", args, kwargs, 1, -1); err != nil {
 		return nil, err
 	}
-	values, ok := args[0].(starlark.Sequence)
+	values, ok := args[0].(starlark.Indexable)
 	if !ok {
 		return nil, fmt.Errorf("Merge: first argument must be a list or tuple of llb.State")
 	}
@@ -560,7 +560,7 @@ func int64At(name string, args starlark.Tuple, index int) (int64, error) {
 }
 
 func stringList(value starlark.Value) ([]string, error) {
-	sequence, ok := value.(starlark.Sequence)
+	sequence, ok := value.(starlark.Indexable)
 	if !ok { return nil, fmt.Errorf("got %s, want list or tuple of strings", valueType(value)) }
 	result := make([]string, sequence.Len())
 	for i := range result {
