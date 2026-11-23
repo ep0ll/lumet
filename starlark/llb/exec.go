@@ -3,8 +3,6 @@ package llb
 import (
 	"fmt"
 	"net"
-	"sort"
-
 	buildkitllb "github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/solver/pb"
 	"go.starlark.net/starlark"
@@ -67,7 +65,9 @@ func (v *ExecStateValue) Attr(name string) (starlark.Value, error) {
 
 func (v *ExecStateValue) AttrNames() []string {
 	names := []string{"AddMount", "GetMount", "Root", "add_mount", "get_mount", "root"}
-	names = append(names, stateAttrNames...)
+	for _, group := range stateAttrNames {
+		names = append(names, group...)
+	}
 	return compactStrings(names)
 }
 
@@ -329,10 +329,22 @@ func (v *secretInfoValue) Attr(name string) (starlark.Value, error) {
 }
 func (v *secretInfoValue) AttrNames() []string { return []string{"id", "target", "mode", "uid", "gid", "optional", "env", "env_name", "ID", "Target", "Mode", "UID", "GID", "Optional", "Env", "EnvName"} }
 
-func wrapMountInfo(info buildkitllb.MountInfo) starlark.Value { return &mountInfoValue{info: info} }
-func wrapCDIDeviceInfo(info buildkitllb.CDIDeviceInfo) starlark.Value { return &cdiDeviceInfoValue{info: info} }
-func wrapSSHInfo(info buildkitllb.SSHInfo) starlark.Value { return &sshInfoValue{info: info} }
-func wrapSecretInfo(info buildkitllb.SecretInfo) starlark.Value { return &secretInfoValue{info: info} }
+// WrapMountInfo adapts a native mount description.
+func WrapMountInfo(info buildkitllb.MountInfo) starlark.Value { return &mountInfoValue{info: info} }
+
+// WrapCDIDeviceInfo adapts a native CDI device description.
+func WrapCDIDeviceInfo(info buildkitllb.CDIDeviceInfo) starlark.Value { return &cdiDeviceInfoValue{info: info} }
+
+// WrapSSHInfo adapts a native SSH socket description.
+func WrapSSHInfo(info buildkitllb.SSHInfo) starlark.Value { return &sshInfoValue{info: info} }
+
+// WrapSecretInfo adapts a native secret description.
+func WrapSecretInfo(info buildkitllb.SecretInfo) starlark.Value { return &secretInfoValue{info: info} }
+
+func wrapMountInfo(info buildkitllb.MountInfo) starlark.Value { return WrapMountInfo(info) }
+func wrapCDIDeviceInfo(info buildkitllb.CDIDeviceInfo) starlark.Value { return WrapCDIDeviceInfo(info) }
+func wrapSSHInfo(info buildkitllb.SSHInfo) starlark.Value { return WrapSSHInfo(info) }
+func wrapSecretInfo(info buildkitllb.SecretInfo) starlark.Value { return WrapSecretInfo(info) }
 
 func optionSliceValue[T any](values []T, kind string) starlark.Value {
 	items := make([]starlark.Value, len(values))
@@ -660,5 +672,4 @@ var (
 	_ starlark.HasAttrs = (*sshInfoValue)(nil)
 	_ starlark.Value    = (*secretInfoValue)(nil)
 	_ starlark.HasAttrs = (*secretInfoValue)(nil)
-	_ = sort.Strings
 )
