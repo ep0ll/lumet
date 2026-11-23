@@ -691,7 +691,7 @@ func goScalar(value starlark.Value) any {
 		return string(v)
 	case starlark.Int:
 		if n, ok := v.Int64(); ok { return n }
-		return v.String()
+		return v.BigInt()
 	case starlark.Float:
 		return float64(v)
 	case starlark.Bool:
