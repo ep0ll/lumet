@@ -60,6 +60,8 @@ type Build struct {
 	started       bool
 	cmdSet        bool
 	stageIndex    int
+	progressGroup string
+	progressTitle string
 	createdAt     *time.Time
 	constraints   []llb.ConstraintsOpt
 	globalArgs    map[string]string
@@ -202,6 +204,7 @@ func (b *Build) Apply(ctx context.Context, instructions ...Instruction) error {
 			return fmt.Errorf("dockerfile: instruction %d is nil", index+1)
 		}
 		name := instructionName(instruction)
+		b.progressGroup, b.progressTitle = "", ""
 		if name == "From" {
 			stageIndex++
 		}
@@ -240,20 +243,30 @@ func instructionName(instruction Instruction) string {
 }
 
 func (b *Build) progressEvent(phase progress.Phase, instruction string, index, total, stageIndex, stageTotal int, started time.Time, err error) progress.Event {
-	group := b.stageName
+	group := b.progressGroup
+	if group == "" {
+		group = b.stageName
+	}
 	if group == "" {
 		group = "build"
 	}
-	message := instruction
+	message := b.progressTitle
+	if message == "" {
+		message = instruction
+	}
 	if b.stageName != "" {
-		message = b.stageName + ": " + instruction
+		message = b.stageName + ": " + message
+	}
+	finished := time.Time{}
+	if phase != progress.Started {
+		finished = time.Now()
 	}
 	return progress.Event{
 		Phase: phase, Group: group, Message: message, Instruction: instruction,
 		InstructionIndex: index, InstructionTotal: total, StageName: b.stageName,
 		StageIndex: stageIndex, StageTotal: stageTotal, Platform: clonePlatform(b.Platform),
 		PlatformSpecified: b.Platform.OS != "" && b.Platform.Architecture != "",
-		StartedAt: started, FinishedAt: time.Now(), Err: err,
+		StartedAt: started, FinishedAt: finished, Err: err,
 	}
 }
 
