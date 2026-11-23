@@ -125,9 +125,12 @@ func resolveCopySource(b *Build, options InstructionOptions) (llb.State, error) 
 	if options.FromState != nil {
 		return *options.FromState, nil
 	}
+	if options.From == "" {
+		return b.BuildContext, nil
+	}
 	from := b.expand(options.From)
 	if from == "" {
-		return b.BuildContext, nil
+		return llb.State{}, fmt.Errorf("COPY --from expands to an empty source")
 	}
 	if stage, ok := b.lookupStage(from); ok {
 		return stage.State, nil
