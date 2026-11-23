@@ -258,6 +258,7 @@ func Cmd(command Command) Instruction {
 			return fmt.Errorf("CMD: %w", err)
 		}
 		b.Image.Config.Cmd = args
+		b.Image.Config.ArgsEscaped = true
 		b.cmdSet = true
 		return b.recordHistory(ctx, "CMD "+formatCommand(command), true)
 	}
@@ -274,6 +275,7 @@ func Entrypoint(command Command) Instruction {
 			return fmt.Errorf("ENTRYPOINT: %w", err)
 		}
 		b.Image.Config.Entrypoint = args
+		b.Image.Config.ArgsEscaped = true
 		if !b.cmdSet {
 			b.Image.Config.Cmd = nil
 		}
