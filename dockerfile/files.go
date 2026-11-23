@@ -65,6 +65,7 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 		if len(sources) == 0 {
 			return fmt.Errorf("ADD: at least one source is required")
 		}
+		destination = b.expand(destination)
 		if destination == "" {
 			return fmt.Errorf("ADD: destination cannot be empty")
 		}
@@ -99,7 +100,7 @@ func resolveCopySource(b *Build, options InstructionOptions) (llb.State, error) 
 	if options.From == "" {
 		return b.BuildContext, nil
 	}
-	if stage, ok := b.stages[options.From]; ok {
+	if stage, ok := b.lookupStage(options.From); ok {
 		return stage.State, nil
 	}
 	if state, ok := b.namedContexts[options.From]; ok {
@@ -175,17 +176,11 @@ func copyOptions(b *Build, options InstructionOptions, unpack bool) []llb.CopyOp
 	if len(options.Excludes) > 0 {
 		info.ExcludePatterns = append(info.ExcludePatterns, options.Excludes...)
 	}
-	result := make([]llb.CopyOption, 0, len(options.CopyOptions)+5)
+	result := make([]llb.CopyOption, 0, len(options.CopyOptions)+3)
 	result = append(result, info)
 	result = append(result, options.CopyOptions...)
 	if options.Chown != "" {
 		result = append(result, llb.WithUser(b.expand(options.Chown)))
-	}
-	if options.Chmod != nil {
-		result = append(result, *options.Chmod)
-	}
-	if len(options.Excludes) > 0 {
-		result = append(result, llb.WithExcludePatterns(options.Excludes))
 	}
 	if b.createdAt != nil {
 		result = append(result, llb.WithCreatedTime(*b.createdAt))
