@@ -81,6 +81,15 @@ func From(reference string, opts ...Option) Instruction {
 			if stage, ok := b.lookupStage(ref); ok {
 				state = stage.State
 				image = cloneImage(stage.Image)
+				for name := range stage.Args {
+					state = state.DelEnv(name)
+				}
+				for _, entry := range image.Config.Env {
+					key, value, found := strings.Cut(entry, "=")
+					if found {
+						state = state.AddEnv(key, value)
+					}
+				}
 				if options.Platform == nil {
 					platform = clonePlatform(stage.Platform)
 				}
