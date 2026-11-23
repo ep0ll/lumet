@@ -2,13 +2,11 @@ package client
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"sync"
 	"syscall"
 
-	buildkitllb "github.com/moby/buildkit/client/llb"
 	gwclient "github.com/moby/buildkit/frontend/gateway/client"
 	"github.com/moby/buildkit/solver/pb"
 	fstypes "github.com/tonistiigi/fsutil/types"
@@ -295,5 +293,3 @@ func stringListValue(values []string) starlark.Value {
 	return starlark.NewList(items)
 }
 
-var _ buildkitllb.State
-var _ context.Context
