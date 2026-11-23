@@ -278,3 +278,49 @@ func optionBuiltin(name, kind string, build func(*starlark.Thread, starlark.Tupl
 var (
 	_ starlark.Value = (*optionValue)(nil)
 )
+
+
+func stringOptionBuiltin[T any](name, kind string, build func(string) T) *starlark.Builtin {
+	return optionBuiltin(name, kind, func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+		if err := arity(name, args, kwargs, 1, 1); err != nil { return nil, err }
+		value, err := stringAt(name, args, 0)
+		if err != nil { return nil, err }
+		return build(value), nil
+	})
+}
+
+func boolOptionBuiltin[T any](name, kind string, build func(bool) T) *starlark.Builtin {
+	return optionBuiltin(name, kind, func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+		if err := arity(name, args, kwargs, 1, 1); err != nil { return nil, err }
+		value, err := boolAt(name, args, 0)
+		if err != nil { return nil, err }
+		return build(value), nil
+	})
+}
+
+func intOptionBuiltin[T any](name, kind string, build func(int) T) *starlark.Builtin {
+	return optionBuiltin(name, kind, func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+		if err := arity(name, args, kwargs, 1, 1); err != nil { return nil, err }
+		value, err := intAt(name, args, 0)
+		if err != nil { return nil, err }
+		return build(value), nil
+	})
+}
+
+func int64OptionBuiltin[T any](name, kind string, build func(int64) T) *starlark.Builtin {
+	return optionBuiltin(name, kind, func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+		if err := arity(name, args, kwargs, 1, 1); err != nil { return nil, err }
+		value, err := int64At(name, args, 0)
+		if err != nil { return nil, err }
+		return build(value), nil
+	})
+}
+
+func uint64OptionBuiltin[T any](name, kind string, build func(uint64) T) *starlark.Builtin {
+	return optionBuiltin(name, kind, func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+		if err := arity(name, args, kwargs, 1, 1); err != nil { return nil, err }
+		value, err := uint64At(name, args, 0)
+		if err != nil { return nil, err }
+		return build(value), nil
+	})
+}
