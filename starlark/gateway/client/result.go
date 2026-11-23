@@ -11,6 +11,19 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// NewResult returns BuildKit's native empty result.
+func NewResult() *gwclient.Result { return gwclient.NewResult() }
+
+// AttestationToPB and AttestationFromPB mirror BuildKit's exported protobuf
+// conversion helpers for host applications using this adapter package.
+func AttestationToPB[T any](value *result.Attestation[T]) (*gatewaypb.Attestation, error) {
+	return gwclient.AttestationToPB(value)
+}
+
+func AttestationFromPB[T any](value *gatewaypb.Attestation) (*result.Attestation[T], error) {
+	return gwclient.AttestationFromPB[T](value)
+}
+
 type ResultValue struct { result *gwclient.Result }
 
 func WrapResult(value *gwclient.Result) *ResultValue { return &ResultValue{result: value} }
@@ -233,6 +246,18 @@ func attestationBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.T
 		iter.Done()
 	}
 	return WrapAttestation(value), nil
+}
+
+func attestationToPBBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var value starlark.Value
+	if err := starlark.UnpackArgs("attestation_to_pb", args, kwargs, "attestation", &value); err != nil { return nil, err }
+	attestation, err := attestationFromValue(value)
+	if err != nil { return nil, err }
+	message, err := AttestationToPB(attestation)
+	if err != nil { return nil, err }
+	data, err := proto.Marshal(message)
+	if err != nil { return nil, err }
+	return starlark.Bytes(data), nil
 }
 
 func attestationFromPBBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
