@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"reflect"
 
-	buildkitllb "github.com/moby/buildkit/client/llb"
 	gwclient "github.com/moby/buildkit/frontend/gateway/client"
 	"github.com/moby/buildkit/solver/pb"
 	sourcepolicy "github.com/moby/buildkit/sourcepolicy/pb"
@@ -530,17 +530,34 @@ func stringBytesMapValue(values map[string][]byte) starlark.Value {
 }
 
 func statValue(stat *types.Stat) starlark.Value {
-	if stat == nil { return starlark.None }
-	fields := starlark.StringDict{
-		"name": starlark.String(stat.Path),
-		"mode": starlark.MakeInt64(int64(stat.Mode)),
-		"size": starlark.MakeInt64(stat.Size),
-		"mod_time": starlark.MakeInt64(stat.ModTime),
-		"is_dir": starlark.Bool(stat.Mode&uint32(1<<31) != 0),
-		"uid": starlark.MakeInt64(int64(stat.Uid)),
-		"gid": starlark.MakeInt64(int64(stat.Gid)),
+	if stat == nil {
+		return starlark.None
+	}
+	value := reflect.ValueOf(stat)
+	if value.Kind() == reflect.Pointer {
+		value = value.Elem()
+	}
+	fields := starlark.StringDict{}
+	typ := value.Type()
+	for i := 0; i < value.NumField(); i++ {
+		field := value.Field(i)
+		definition := typ.Field(i)
+		if definition.PkgPath != "" || !field.CanInterface() {
+			continue
+		}
+		name := starlarkllb.SnakeCaseIdentifier(definition.Name)
+		switch field.Kind() {
+		case reflect.String:
+			fields[name] = starlark.String(field.String())
+		case reflect.Bool:
+			fields[name] = starlark.Bool(field.Bool())
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			fields[name] = starlark.MakeInt64(field.Int())
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			fields[name] = starlark.MakeUint64(field.Uint())
+		case reflect.Float32, reflect.Float64:
+			fields[name] = starlark.Float(field.Float())
+		}
 	}
 	return structValue("stat", fields)
 }
-
-var _ = buildkitllb.State{}
