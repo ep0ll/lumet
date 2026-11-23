@@ -73,6 +73,7 @@ func From(reference string, opts ...Option) Instruction {
 			state         llb.State
 			image         = emptyImage(platform)
 			inheritedArgs = make(map[string]string)
+			inheritedEnv  map[string]string
 		)
 		switch {
 		case options.BaseState != nil:
@@ -84,6 +85,7 @@ func From(reference string, opts ...Option) Instruction {
 				state = stage.State
 				image = cloneImage(stage.Image)
 				inheritedArgs = maps.Clone(stage.Args)
+				inheritedEnv = maps.Clone(stage.BuildEnv)
 				if options.Platform == nil {
 					platform = clonePlatform(stage.Platform)
 				}
@@ -107,6 +109,10 @@ func From(reference string, opts ...Option) Instruction {
 					}
 				}
 			}
+		}
+
+		if inheritedEnv == nil {
+			inheritedEnv = environmentFromConfig(image.Config.Env)
 		}
 
 		image.OS = platform.OS
@@ -162,6 +168,7 @@ func Arg(name string, opts ...Option) Instruction {
 		if b.started {
 			if exists {
 				b.stageArgs[name] = value
+				b.stageEnv[name] = value
 				b.State = b.State.AddEnv(name, value)
 			}
 		} else {
@@ -180,7 +187,7 @@ func Env(values ...KeyValue) Instruction {
 		parts := make([]string, 0, len(values))
 		// Dockerfile variable replacement for a single ENV instruction uses
 		// the environment that existed before the instruction is applied.
-		previousEnv := append([]string(nil), b.Image.Config.Env...)
+		previousEnv := maps.Clone(b.stageEnv)
 		for _, item := range values {
 			if item.Key == "" {
 				return fmt.Errorf("ENV: key cannot be empty")
@@ -188,6 +195,7 @@ func Env(values ...KeyValue) Instruction {
 			value := expandVariables(item.Value, b.stageArgs, previousEnv)
 			b.State = b.State.AddEnv(item.Key, value)
 			b.Image.Config.Env = setEnv(b.Image.Config.Env, item.Key, value)
+			b.stageEnv[item.Key] = value
 			parts = append(parts, item.Key+"="+value)
 		}
 		return b.recordHistory(ctx, "ENV "+strings.Join(parts, " "), true)
