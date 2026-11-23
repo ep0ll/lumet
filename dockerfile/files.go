@@ -70,16 +70,19 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 			return fmt.Errorf("ADD: destination cannot be empty")
 		}
 
-		unpack := true
-		if options.Unpack != nil {
-			unpack = *options.Unpack
-		}
-		copyOpts := copyOptions(b, options, unpack)
 		for _, source := range sources {
 			state, sourcePath, err := resolveAddSource(b, source, options)
 			if err != nil {
 				return fmt.Errorf("ADD %q: %w", source.Value, err)
 			}
+
+			// Docker's implicit archive extraction applies to local ADD sources.
+			// Remote URLs remain files unless the caller explicitly opts in.
+			unpack := source.Kind == AddLocal
+			if options.Unpack != nil {
+				unpack = *options.Unpack
+			}
+			copyOpts := copyOptions(b, options, unpack)
 			b.State = b.State.File(
 				llb.Copy(state, sourcePath, destination, copyOpts...),
 				combineConstraints(b, options)...,
@@ -124,7 +127,8 @@ func resolveAddSource(b *Build, source AddSource, options InstructionOptions) (l
 			return llb.State{}, "", fmt.Errorf("remote URL cannot be empty")
 		}
 		parsed, err := url.Parse(source.Value)
-		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		scheme := strings.ToLower(parsed.Scheme)
+		if err != nil || (scheme != "http" && scheme != "https") {
 			return llb.State{}, "", fmt.Errorf("ADD remote source must be an HTTP(S) URL")
 		}
 		filename := path.Base(parsed.Path)
