@@ -2,9 +2,9 @@ package dockerfile
 
 import (
 	"context"
+	"strings"
 	"syscall"
 	"testing"
-	"strings"
 	"time"
 
 	"github.com/moby/buildkit/client/llb"
