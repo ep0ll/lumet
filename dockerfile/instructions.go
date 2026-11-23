@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"syscall"
@@ -186,6 +185,9 @@ func Env(values ...KeyValue) Instruction {
 		if err := b.requireStage("ENV"); err != nil {
 			return err
 		}
+		if len(values) == 0 {
+			return fmt.Errorf("ENV: at least one key/value pair is required")
+		}
 		parts := make([]string, 0, len(values))
 		// Dockerfile variable replacement for a single ENV instruction uses
 		// the environment that existed before the instruction is applied.
@@ -209,6 +211,9 @@ func Label(values ...KeyValue) Instruction {
 	return func(ctx context.Context, b *Build) error {
 		if err := b.requireStage("LABEL"); err != nil {
 			return err
+		}
+		if len(values) == 0 {
+			return fmt.Errorf("LABEL: at least one key/value pair is required")
 		}
 		if b.Image.Config.Labels == nil {
 			b.Image.Config.Labels = make(map[string]string, len(values))
@@ -288,6 +293,9 @@ func Expose(ports ...string) Instruction {
 		if err := b.requireStage("EXPOSE"); err != nil {
 			return err
 		}
+		if len(ports) == 0 {
+			return fmt.Errorf("EXPOSE: at least one port is required")
+		}
 		if b.Image.Config.ExposedPorts == nil {
 			b.Image.Config.ExposedPorts = make(map[string]struct{})
 		}
@@ -310,6 +318,9 @@ func Volume(paths ...string) Instruction {
 		if err := b.requireStage("VOLUME"); err != nil {
 			return err
 		}
+		if len(paths) == 0 {
+			return fmt.Errorf("VOLUME: at least one path is required")
+		}
 		if b.Image.Config.Volumes == nil {
 			b.Image.Config.Volumes = make(map[string]struct{}, len(paths))
 		}
@@ -318,10 +329,14 @@ func Volume(paths ...string) Instruction {
 				return fmt.Errorf("VOLUME: path cannot be empty")
 			}
 			value = b.expand(value)
-			if !strings.HasPrefix(value, "/") {
-				value = path.Join(b.Image.Config.WorkingDir, value)
+			if value == "" {
+				return fmt.Errorf("VOLUME: expanded path cannot be empty")
 			}
-			b.Image.Config.Volumes[path.Clean(value)] = struct{}{}
+			normalized, err := system.NormalizeWorkdir(b.Image.Config.WorkingDir, value, b.Platform.OS)
+			if err != nil {
+				return fmt.Errorf("VOLUME: normalize path: %w", err)
+			}
+			b.Image.Config.Volumes[system.ToSlash(normalized, b.Platform.OS)] = struct{}{}
 		}
 		return b.recordHistory(ctx, "VOLUME "+strings.Join(paths, " "), true)
 	}
@@ -338,6 +353,9 @@ func User(user string) Instruction {
 			return fmt.Errorf("USER: user cannot be empty")
 		}
 		user = b.expand(user)
+		if user == "" {
+			return fmt.Errorf("USER: expanded user cannot be empty")
+		}
 		b.State = b.State.User(user)
 		b.Image.Config.User = user
 		return b.recordHistory(ctx, "USER "+user, true)
@@ -351,6 +369,9 @@ func Workdir(directory string) Instruction {
 			return err
 		}
 		directory = b.expand(directory)
+		if directory == "" {
+			return fmt.Errorf("WORKDIR: directory cannot be empty")
+		}
 		normalized, err := system.NormalizeWorkdir(b.Image.Config.WorkingDir, directory, b.Platform.OS)
 		if err != nil {
 			return fmt.Errorf("WORKDIR: normalize path: %w", err)
@@ -384,7 +405,10 @@ func StopSignal(signal os.Signal) Instruction {
 			return fmt.Errorf("STOPSIGNAL: signal cannot be nil")
 		}
 		value := signal.String()
-		if number, ok := signal.(syscall.Signal); ok && number > 0 {
+		if number, ok := signal.(syscall.Signal); ok {
+			if number <= 0 {
+				return fmt.Errorf("STOPSIGNAL: signal number must be positive")
+			}
 			value = strconv.Itoa(int(number))
 		}
 		b.Image.Config.StopSignal = value
