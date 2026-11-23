@@ -64,12 +64,6 @@ func NewThread(ctx context.Context) *starlark.Thread {
 		return thread
 	}
 	thread.SetLocal("context", ctx)
-	if done := ctx.Done(); done != nil {
-		go func() {
-			<-done
-			thread.Cancel("context cancelled")
-		}()
-	}
 	return thread
 }
 
@@ -80,6 +74,12 @@ func Exec(ctx context.Context, filename string, src any, predeclared starlark.St
 		predeclared = starlark.StringDict{}
 	}
 	thread := NewThread(ctx)
+	if ctx != nil {
+		stop := context.AfterFunc(ctx, func() {
+			thread.Cancel("context cancelled")
+		})
+		defer stop()
+	}
 	return starlark.ExecFileOptions(&syntax.FileOptions{}, thread, filename, src, predeclared)
 }
 
