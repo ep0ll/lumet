@@ -40,13 +40,13 @@ func Copy(sources []string, destination string, opts ...Option) Instruction {
 
 			if options.link {
 				copyState := llb.Scratch().Platform(b.Platform).Dir(b.Image.Config.WorkingDir)
-				copyState = copyState.File(llb.Copy(sourceState, sourcePath, target, copyOpts...), append(b.constraints, options.constraints...)...)
-				b.State = llb.Merge([]llb.State{b.State, copyState}, append(b.constraints, options.constraints...)...)
+				copyState = copyState.File(llb.Copy(sourceState, sourcePath, target, copyOpts...), combineConstraints(b, options)...)
+				b.State = llb.Merge([]llb.State{b.State, copyState}, combineConstraints(b, options)...)
 				continue
 			}
 			b.State = b.State.File(
 				llb.Copy(sourceState, sourcePath, target, copyOpts...),
-				append(b.constraints, options.constraints...)...,
+				combineConstraints(b, options)...,
 			)
 		}
 		return b.recordHistory(ctx, "COPY "+strings.Join(sources, " ")+" "+destination, false)
@@ -74,13 +74,13 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 		}
 		copyOpts := copyOptions(b, options, unpack)
 		for _, source := range sources {
-			state, sourcePath, err := resolveAddSource(b, source, options)
+			state, sourcePath, err := resolveAddSource(source, options)
 			if err != nil {
 				return fmt.Errorf("ADD %q: %w", source.Value, err)
 			}
 			b.State = b.State.File(
 				llb.Copy(state, sourcePath, destination, copyOpts...),
-				append(b.constraints, options.constraints...)...,
+				combineConstraints(b, options)...,
 			)
 		}
 		descriptions := make([]string, 0, len(sources))
@@ -107,13 +107,13 @@ func resolveCopySource(b *Build, options instructionOptions) (llb.State, error) 
 	return llb.State{}, fmt.Errorf("source stage or context %q does not exist", options.from)
 }
 
-func resolveAddSource(b *Build, source AddSource, options instructionOptions) (llb.State, string, error) {
+func resolveAddSource(source AddSource, options instructionOptions) (llb.State, string, error) {
 	switch source.Kind {
 	case AddLocal:
 		if source.Value == "" {
 			return llb.State{}, "", fmt.Errorf("local source path cannot be empty")
 		}
-		return b.BuildContext, rootPath(b.expand(source.Value)), nil
+		return llb.State{}, rootPath(source.Value), nil
 	case AddRemote:
 		if source.Value == "" {
 			return llb.State{}, "", fmt.Errorf("remote URL cannot be empty")
@@ -134,8 +134,7 @@ func resolveAddSource(b *Build, source AddSource, options instructionOptions) (l
 		if checksum != "" {
 			httpOptions = append(httpOptions, llb.Checksum(checksum))
 		}
-		state := llb.HTTP(source.Value, httpOptions...)
-		return state, "/" + filename, nil
+		return llb.HTTP(source.Value, httpOptions...), "/" + filename, nil
 	case AddGit:
 		if source.Value == "" {
 			return llb.State{}, "", fmt.Errorf("Git remote cannot be empty")
@@ -160,17 +159,11 @@ func resolveAddSource(b *Build, source AddSource, options instructionOptions) (l
 }
 
 func copyOptions(b *Build, options instructionOptions, unpack bool) []llb.CopyOption {
-	result := make([]llb.CopyOption, 0, len(options.copy)+4)
-	result = append(result, options.copy...)
 	info := &llb.CopyInfo{
 		CreateDestPath: true,
 		AllowWildcard:  true,
 		FollowSymlinks: true,
 		AttemptUnpack:  unpack,
-	}
-	if options.chown != "" {
-		info.ChownOpt = nil
-		result = append(result, llb.WithUser(options.chown))
 	}
 	if options.chmod != nil {
 		info.Mode = options.chmod
@@ -178,10 +171,28 @@ func copyOptions(b *Build, options instructionOptions, unpack bool) []llb.CopyOp
 	if len(options.excludes) > 0 {
 		info.ExcludePatterns = append(info.ExcludePatterns, options.excludes...)
 	}
+	result := make([]llb.CopyOption, 0, len(options.copy)+5)
+	result = append(result, info)
+	result = append(result, options.copy...)
+	if options.chown != "" {
+		result = append(result, llb.WithUser(options.chown))
+	}
+	if options.chmod != nil {
+		result = append(result, *options.chmod)
+	}
+	if len(options.excludes) > 0 {
+		result = append(result, llb.WithExcludePatterns(options.excludes))
+	}
 	if b.createdAt != nil {
 		result = append(result, llb.WithCreatedTime(*b.createdAt))
 	}
-	result = append(result, info)
+	return result
+}
+
+func combineConstraints(b *Build, options instructionOptions) []llb.ConstraintsOpt {
+	result := make([]llb.ConstraintsOpt, 0, len(b.constraints)+len(options.constraints))
+	result = append(result, b.constraints...)
+	result = append(result, options.constraints...)
 	return result
 }
 
@@ -199,9 +210,10 @@ func preservedSourcePath(source string) string {
 		source = source[index+3:]
 	} else {
 		source = strings.TrimPrefix(source, "./")
-		if !strings.HasPrefix(source, "./") && !strings.Contains(source, "/") {
-			return path.Base(source)
-		}
 	}
-	return strings.TrimPrefix(path.Clean(source), "/")
+	cleaned := strings.TrimPrefix(path.Clean(source), "/")
+	if cleaned == "." || cleaned == "" {
+		return path.Base(source)
+	}
+	return cleaned
 }
