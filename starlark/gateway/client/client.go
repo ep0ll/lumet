@@ -270,8 +270,26 @@ func attestationChainValue(chain *buildkitsourceresolver.AttestationChain) starl
 	if chain == nil { return starlark.None }
 	blobs := starlark.NewDict(len(chain.Blobs))
 	for dgst, blob := range chain.Blobs {
+		urls := make([]starlark.Value, len(blob.Descriptor.URLs))
+		for i, url := range blob.Descriptor.URLs {
+			urls[i] = starlark.String(url)
+		}
+		var platform starlark.Value = starlark.None
+		if blob.Descriptor.Platform != nil {
+			platform = starlarkllb.WrapOCIPlatform(*blob.Descriptor.Platform)
+		}
+		descriptor := structValue("descriptor", starlark.StringDict{
+			"media_type": starlark.String(string(blob.Descriptor.MediaType)),
+			"digest": starlark.String(blob.Descriptor.Digest.String()),
+			"size": starlark.MakeInt64(blob.Descriptor.Size),
+			"urls": starlark.NewList(urls),
+			"annotations": stringMapValue(blob.Descriptor.Annotations),
+			"data": starlark.Bytes(append([]byte(nil), blob.Descriptor.Data...)),
+			"artifact_type": starlark.String(blob.Descriptor.ArtifactType),
+			"platform": platform,
+		})
 		value := structValue("blob", starlark.StringDict{
-			"descriptor": starlark.String(fmt.Sprint(blob.Descriptor)),
+			"descriptor": descriptor,
 			"data": starlark.Bytes(append([]byte(nil), blob.Data...)),
 		})
 		_ = blobs.SetKey(starlark.String(dgst.String()), value)
