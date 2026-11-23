@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"sync"
 
+	gwclient "github.com/moby/buildkit/frontend/gateway/client"
+	starlarkgatewayclient "github.com/ep0ll/lumet/starlark/gateway/client"
+
 	starlarkllb "github.com/ep0ll/lumet/starlark/llb"
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
@@ -108,6 +111,50 @@ func ExecWithOptions(ctx context.Context, filename string, src any, predeclared 
 		predeclared = Predeclared()
 	}
 	thread := NewThreadWithLoader(ctx, options.Loader)
+	thread.Print = options.Print
+	if options.MaxSteps > 0 {
+		thread.SetMaxExecutionSteps(options.MaxSteps)
+	}
+	if ctx != nil {
+		stop := context.AfterFunc(ctx, func() {
+			thread.Cancel("context cancelled")
+		})
+		defer stop()
+	}
+	fileOptions := options.FileOptions
+	return starlark.ExecFileOptions(&fileOptions, thread, filename, src, predeclared)
+}
+
+
+// NewThreadWithGateway creates a Starlark thread whose per-invocation
+// gateway/client module is bound to gatewayClient. The dynamic module is
+// resolved before the optional application loader, while static first-party
+// modules continue to be served by the regular registry.
+func NewThreadWithGateway(ctx context.Context, gatewayClient gwclient.Client, loader ModuleLoader) *starlark.Thread {
+	fallback := func(thread *starlark.Thread, module string) (starlark.StringDict, error) {
+		switch normalizeModuleName(module) {
+		case "gateway/client":
+			if gatewayClient == nil {
+				return nil, fmt.Errorf("modules: load gateway/client requires a BuildKit gateway client")
+			}
+			return starlarkgatewayclient.Members(gatewayClient), nil
+		}
+		if loader != nil {
+			return loader(thread, module)
+		}
+		return nil, fmt.Errorf("%w: %q", ErrUnknownModule, module)
+	}
+	return NewThreadWithLoader(ctx, fallback)
+}
+
+// ExecWithGateway evaluates src with the active BuildKit gateway client
+// available through load("gateway/client", ...). Gateway clients are bound
+// per thread and are never stored in the process-wide module registry.
+func ExecWithGateway(ctx context.Context, gatewayClient gwclient.Client, filename string, src any, predeclared starlark.StringDict, options ExecOptions) (starlark.StringDict, error) {
+	if predeclared == nil {
+		predeclared = Predeclared()
+	}
+	thread := NewThreadWithGateway(ctx, gatewayClient, options.Loader)
 	thread.Print = options.Print
 	if options.MaxSteps > 0 {
 		thread.SetMaxExecutionSteps(options.MaxSteps)
