@@ -55,12 +55,12 @@ func From(reference string, opts ...Option) Instruction {
 		b.saveStage()
 
 		ref := b.expand(reference)
-		if ref == "" && options.baseState == nil {
+		if ref == "" && options.BaseState == nil {
 			return fmt.Errorf("FROM: image reference cannot be empty")
 		}
 		platform := clonePlatform(b.Platform)
-		if options.platform != nil {
-			platform = clonePlatform(*options.platform)
+		if options.Platform != nil {
+			platform = clonePlatform(*options.Platform)
 		}
 
 		var (
@@ -68,21 +68,21 @@ func From(reference string, opts ...Option) Instruction {
 			image = emptyImage(platform)
 		)
 		switch {
-		case options.baseState != nil:
-			state = *options.baseState
+		case options.BaseState != nil:
+			state = *options.BaseState
 		case strings.EqualFold(ref, "scratch"):
 			state = llb.Scratch()
 		default:
 			if stage, ok := b.stages[ref]; ok {
 				state = stage.State
 				image = cloneImage(stage.Image)
-				if options.platform == nil {
+				if options.Platform == nil {
 					platform = clonePlatform(stage.Platform)
 				}
 			} else if named, ok := b.namedContexts[ref]; ok {
 				state = named
 			} else {
-				state = llb.Image(ref, options.image...)
+				state = llb.Image(ref, options.ImageOptions...)
 				if b.ImageResolver != nil {
 					resolved, err := b.ImageResolver(ctx, ref, platform)
 					if err != nil {
@@ -115,7 +115,7 @@ func From(reference string, opts ...Option) Instruction {
 		b.State = state
 		b.Image = image
 		b.Platform = platform
-		b.stageName = options.stageName
+		b.stageName = options.StageName
 		b.started = true
 		return nil
 	}
@@ -130,8 +130,8 @@ func Arg(name string, opts ...Option) Instruction {
 			return fmt.Errorf("ARG: name cannot be empty")
 		}
 		value, exists := b.BuildArgs[name]
-		if !exists && options.argDefault != nil {
-			value = b.expand(*options.argDefault)
+		if !exists && options.ArgDefault != nil {
+			value = b.expand(*options.ArgDefault)
 			b.BuildArgs[name] = value
 			exists = true
 		}
@@ -373,15 +373,15 @@ func Healthcheck(command Command, opts ...Option) Instruction {
 		default:
 			return fmt.Errorf("HEALTHCHECK: unsupported command form %T", command)
 		}
-		if options.healthInterval < 0 || options.healthTimeout < 0 ||
-			options.healthStartPeriod < 0 || options.healthStartInterval < 0 ||
-			options.healthRetries < 0 {
+		if options.HealthInterval < 0 || options.HealthTimeout < 0 ||
+			options.HealthStartPeriod < 0 || options.HealthStartInterval < 0 ||
+			options.HealthRetries < 0 {
 			return fmt.Errorf("HEALTHCHECK: durations and retries cannot be negative")
 		}
 		b.Image.Config.Healthcheck = &dockerspec.HealthcheckConfig{
-			Test: test, Interval: options.healthInterval,
-			Timeout: options.healthTimeout, StartPeriod: options.healthStartPeriod,
-			StartInterval: options.healthStartInterval, Retries: options.healthRetries,
+			Test: test, Interval: options.HealthInterval,
+			Timeout: options.HealthTimeout, StartPeriod: options.HealthStartPeriod,
+			StartInterval: options.HealthStartInterval, Retries: options.HealthRetries,
 		}
 		return b.recordHistory(ctx, "HEALTHCHECK "+formatCommand(command), true)
 	}
