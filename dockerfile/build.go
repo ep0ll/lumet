@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/moby/buildkit/client/llb"
+	"github.com/ep0ll/lumet/dockerfile/expand"
+	"github.com/ep0ll/lumet/dockerfile/progress"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -32,6 +34,19 @@ type Instruction func(context.Context, *Build) error
 // LLB image resolution remains BuildKit's responsibility; this callback gives
 // the builder the Docker-specific config needed for history and metadata.
 type ImageResolver func(context.Context, string, ocispecs.Platform) (dockerspec.DockerOCIImage, error)
+
+// VariableExpander is a pluggable variable expansion strategy. It receives a
+// lookup scoped to the current instruction and the configured source escape rune.
+type VariableExpander interface {
+	Expand(input string, lookup expand.Lookup, config expand.Config) (string, error)
+}
+
+// VariableExpanderFunc adapts a function to VariableExpander.
+type VariableExpanderFunc func(string, expand.Lookup, expand.Config) (string, error)
+
+func (fn VariableExpanderFunc) Expand(input string, lookup expand.Lookup, config expand.Config) (string, error) {
+	return fn(input, lookup, config)
+}
 
 // HistoryRecorder observes history entries after they have been appended.
 type HistoryRecorder func(context.Context, ocispecs.History) error
@@ -51,6 +66,7 @@ type Build struct {
 	ImageResolver   ImageResolver
 	HistoryRecorder HistoryRecorder
 	ProgressReporter progress.Reporter
+	VariableExpander VariableExpander
 	EscapeToken      rune
 
 	namedContexts map[string]llb.State
@@ -163,6 +179,11 @@ func WithCreatedAt(t time.Time) BuildOption {
 // WithProgressReporter installs a UI-agnostic observer for instruction lifecycle events.
 func WithProgressReporter(reporter progress.Reporter) BuildOption {
 	return func(b *Build) { b.ProgressReporter = reporter }
+}
+
+// WithVariableExpander installs a custom variable expansion strategy.
+func WithVariableExpander(expander VariableExpander) BuildOption {
+	return func(b *Build) { b.VariableExpander = expander }
 }
 
 // WithEscapeToken configures the source-format escape rune used when expanding
@@ -348,11 +369,26 @@ func (b *Build) requireStage(instruction string) error {
 }
 
 func (b *Build) expand(value string) string {
-	return expandVariablesWithEscape(value, b.stageEnv, b.EscapeToken)
+	return b.expandMap(value, b.stageEnv)
 }
 
 func (b *Build) expandGlobal(value string) string {
-	return expandVariablesWithEscape(value, b.globalArgs, b.EscapeToken)
+	return b.expandMap(value, b.globalArgs)
+}
+
+func (b *Build) expandMap(value string, values map[string]string) string {
+	lookup := expand.MapLookup(values)
+	strategy := b.VariableExpander
+	if strategy == nil {
+		strategy = VariableExpanderFunc(func(input string, lookup expand.Lookup, config expand.Config) (string, error) {
+			return expand.New(config, lookup).Expand(input)
+		})
+	}
+	result, err := strategy.Expand(value, lookup, expand.Config{Escape: b.EscapeToken})
+	if err != nil {
+		return value
+	}
+	return result
 }
 
 func (b *Build) recordHistory(ctx context.Context, createdBy string, emptyLayer bool) error {
