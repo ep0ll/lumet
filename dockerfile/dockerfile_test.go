@@ -329,3 +329,36 @@ func TestHealthcheckDockerDefaults(t *testing.T) {
 		t.Fatalf("unexpected Dockerfile healthcheck defaults: %#v", health)
 	}
 }
+
+
+func TestEntrypointClearsInheritedCmdUnlessCurrentStageSetsOne(t *testing.T) {
+	platform := ocispecs.Platform{OS: "linux", Architecture: "amd64"}
+	resolver := func(_ context.Context, _ string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
+		image := emptyImage(platform)
+		image.Config.Cmd = []string{"base-command"}
+		return image, nil
+	}
+
+	build := New(WithPlatform(platform), WithImageResolver(resolver))
+	if err := build.Apply(context.Background(),
+		From("example/base:latest"),
+		Entrypoint(Exec("app")),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if len(build.Image.Config.Cmd) != 0 {
+		t.Fatalf("ENTRYPOINT should clear an inherited CMD: %#v", build.Image.Config.Cmd)
+	}
+
+	build = New(WithPlatform(platform))
+	if err := build.Apply(context.Background(),
+		From("scratch"),
+		Cmd(Exec("default-arg")),
+		Entrypoint(Exec("app")),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if len(build.Image.Config.Cmd) != 1 || build.Image.Config.Cmd[0] != "default-arg" {
+		t.Fatalf("ENTRYPOINT should preserve a CMD declared in this stage: %#v", build.Image.Config.Cmd)
+	}
+}
