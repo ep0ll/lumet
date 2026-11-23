@@ -21,6 +21,7 @@ func Copy(sources []string, destination string, opts ...Option) Instruction {
 		if len(sources) == 0 {
 			return fmt.Errorf("COPY: at least one source is required")
 		}
+		destination = b.expand(destination)
 		if destination == "" {
 			return fmt.Errorf("COPY: destination cannot be empty")
 		}
@@ -108,6 +109,9 @@ func resolveCopySource(b *Build, options InstructionOptions) (llb.State, error) 
 }
 
 func resolveAddSource(b *Build, source AddSource, options InstructionOptions) (llb.State, string, error) {
+	source.Value = b.expand(source.Value)
+	source.Ref = b.expand(source.Ref)
+	source.Subdir = b.expand(source.Subdir)
 	switch source.Kind {
 	case AddLocal:
 		if source.Value == "" {
@@ -175,7 +179,7 @@ func copyOptions(b *Build, options InstructionOptions, unpack bool) []llb.CopyOp
 	result = append(result, info)
 	result = append(result, options.CopyOptions...)
 	if options.Chown != "" {
-		result = append(result, llb.WithUser(options.Chown))
+		result = append(result, llb.WithUser(b.expand(options.Chown)))
 	}
 	if options.Chmod != nil {
 		result = append(result, *options.Chmod)
@@ -212,7 +216,10 @@ func preservedSourcePath(source string) string {
 		source = strings.TrimPrefix(source, "./")
 	}
 	cleaned := strings.TrimPrefix(path.Clean(source), "/")
-	if cleaned == "." || cleaned == "" {
+	for strings.HasPrefix(cleaned, "../") {
+		cleaned = strings.TrimPrefix(cleaned, "../")
+	}
+	if cleaned == "." || cleaned == "" || cleaned == ".." {
 		return path.Base(source)
 	}
 	return cleaned
