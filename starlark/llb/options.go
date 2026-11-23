@@ -215,15 +215,6 @@ func createdTimeOption(a starlark.Tuple) (any, error) {
 	return buildkitllb.WithCreatedTime(t), nil
 }
 
-/*
-		"CreatedTime": optionBuiltin("WithCreatedTime", func(a starlark.Tuple) (any, error) {
-			raw, err := stringAt("WithCreatedTime", a, 0); if err != nil { return nil, err }
-			t, err := time.Parse(time.RFC3339Nano, raw); if err != nil { return nil, fmt.Errorf("WithCreatedTime: %w", err) }
-			return buildkitllb.WithCreatedTime(t), nil
-		}, 1, 1, "CreatedTime"),
-	}
-}
-*/
 
 func optionBuiltin(name string, build func(starlark.Tuple) (any, error), min, max int, kind string) starlark.Value {
 	return builtin(name, func(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
