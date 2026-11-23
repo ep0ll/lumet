@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"fmt"
 
 	gwclient "github.com/moby/buildkit/frontend/gateway/client"
@@ -248,4 +247,3 @@ func attestationFromPBBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args star
 	return WrapAttestation(value), nil
 }
 
-var _ = context.Background
