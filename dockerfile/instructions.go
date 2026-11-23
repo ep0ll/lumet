@@ -141,6 +141,9 @@ func From(reference string, opts ...Option) Instruction {
 func Arg(name string, opts ...Option) Instruction {
 	options := collectOptions(opts)
 	return func(ctx context.Context, b *Build) error {
+		if b == nil {
+			return fmt.Errorf("ARG: nil build")
+		}
 		if name == "" {
 			return fmt.Errorf("ARG: name cannot be empty")
 		}
