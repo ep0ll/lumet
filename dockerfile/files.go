@@ -127,8 +127,11 @@ func resolveAddSource(b *Build, source AddSource, options InstructionOptions) (l
 			return llb.State{}, "", fmt.Errorf("remote URL cannot be empty")
 		}
 		parsed, err := url.Parse(source.Value)
+		if err != nil {
+			return llb.State{}, "", fmt.Errorf("parse remote URL: %w", err)
+		}
 		scheme := strings.ToLower(parsed.Scheme)
-		if err != nil || (scheme != "http" && scheme != "https") {
+		if scheme != "http" && scheme != "https" {
 			return llb.State{}, "", fmt.Errorf("ADD remote source must be an HTTP(S) URL")
 		}
 		filename := path.Base(parsed.Path)
