@@ -102,15 +102,17 @@ func metaResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.
 
 func resolveImageResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var rawDigest string
-	var config []byte
+	var configValue starlark.Value
 	var chainValue starlark.Value = starlark.None
 	if err := starlark.UnpackArgs("ResolveImageResponse", args, kwargs,
 		"digest", &rawDigest,
-		"config", &config,
+		"config", &configValue,
 		"attestation_chain?", &chainValue,
 	); err != nil {
 		return nil, err
 	}
+	config, err := bytesArg("ResolveImageResponse.config", configValue)
+	if err != nil { return nil, err }
 	dgst, err := digest.Parse(rawDigest)
 	if err != nil { return nil, fmt.Errorf("ResolveImageResponse.digest: %w", err) }
 	response := &buildkitsourceresolver.ResolveImageResponse{Digest: dgst, Config: config}
@@ -126,11 +128,20 @@ func resolveImageResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args s
 
 func resolveGitResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var checksum, ref, commitChecksum string
-	var commitObject, tagObject []byte
+	var commitObjectValue, tagObjectValue starlark.Value = starlark.None, starlark.None
 	if err := starlark.UnpackArgs("ResolveGitResponse", args, kwargs,
 		"checksum?", &checksum, "ref?", &ref, "commit_checksum?", &commitChecksum,
-		"commit_object?", &commitObject, "tag_object?", &tagObject,
+		"commit_object?", &commitObjectValue, "tag_object?", &tagObjectValue,
 	); err != nil { return nil, err }
+	var commitObject, tagObject []byte
+	if commitObjectValue != starlark.None {
+		commitObject, err = bytesArg("ResolveGitResponse.commit_object", commitObjectValue)
+		if err != nil { return nil, err }
+	}
+	if tagObjectValue != starlark.None {
+		tagObject, err = bytesArg("ResolveGitResponse.tag_object", tagObjectValue)
+		if err != nil { return nil, err }
+	}
 	response := &buildkitsourceresolver.ResolveGitResponse{
 		Checksum: checksum, Ref: ref, CommitChecksum: commitChecksum,
 		CommitObject: commitObject, TagObject: tagObject,
@@ -170,8 +181,14 @@ func resolveHTTPResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args st
 
 func resolveHTTPChecksumResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var value string
+	var suffixValue starlark.Value = starlark.None
+	if err := starlark.UnpackArgs("ResolveHTTPChecksumResponse", args, kwargs, "digest", &value, "suffix?",&suffixValue); err != nil { return nil, err }
 	var suffix []byte
-	if err := starlark.UnpackArgs("ResolveHTTPChecksumResponse", args, kwargs, "digest", &value, "suffix?",&suffix); err != nil { return nil, err }
+	if suffixValue != starlark.None {
+		var err error
+		suffix, err = bytesArg("ResolveHTTPChecksumResponse.suffix", suffixValue)
+		if err != nil { return nil, err }
+	}
 	response := &buildkitsourceresolver.ResolveHTTPChecksumResponse{Digest:value,Suffix:suffix}
 	return newRecord("ResolveHTTPChecksumResponse",response,starlark.StringDict{"digest":starlark.String(value),"suffix":bytesField(suffix)}),nil
 }
@@ -179,10 +196,12 @@ func resolveHTTPChecksumResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin,
 func blobBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var mediaType, rawDigest string
 	var size int64
-	var data []byte
+	var dataValue starlark.Value
 	if err := starlark.UnpackArgs("Blob", args, kwargs,
-		"media_type", &mediaType, "digest", &rawDigest, "size", &size, "data", &data,
+		"media_type", &mediaType, "digest", &rawDigest, "size", &size, "data", &dataValue,
 	); err != nil { return nil, err }
+	data, err := bytesArg("Blob.data", dataValue)
+	if err != nil { return nil, err }
 	dgst, err := digest.Parse(rawDigest)
 	if err != nil { return nil, err }
 	blob := buildkitsourceresolver.Blob{
