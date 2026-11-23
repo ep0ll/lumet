@@ -1,0 +1,283 @@
+// Package dockerfile provides a functional, Dockerfile-inspired API for building
+// BuildKit LLB states and Docker/OCI image configuration.
+//
+// Each instruction constructor returns an Instruction. Instructions are applied
+// in order to a Build, which carries both the immutable LLB state and mutable
+// image metadata. The package intentionally does not parse Dockerfile text.
+package dockerfile
+
+import (
+	"context"
+	"fmt"
+	"maps"
+	"runtime"
+	"slices"
+	"time"
+
+	"github.com/moby/buildkit/client/llb"
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
+)
+
+// Instruction is a build step. Constructors such as From, Run and Copy return
+// Instructions, which can be composed with Build.Apply.
+type Instruction func(context.Context, *Build) error
+
+// ImageResolver resolves the image configuration for a FROM instruction.
+// LLB image resolution remains BuildKit's responsibility; this callback gives
+// the builder the Docker-specific config needed for history and metadata.
+type ImageResolver func(context.Context, string, ocispecs.Platform) (dockerspec.DockerOCIImage, error)
+
+// HistoryRecorder observes history entries after they have been appended.
+type HistoryRecorder func(context.Context, ocispecs.History) error
+
+// BuildOption configures a new Build.
+type BuildOption func(*Build)
+
+// Build is the mutable instruction-application context. Its State value remains
+// immutable: each LLB operation returns a new state graph.
+type Build struct {
+	State        llb.State
+	Image        dockerspec.DockerOCIImage
+	Platform     ocispecs.Platform
+	BuildContext llb.State
+	BuildArgs    map[string]string
+
+	ImageResolver  ImageResolver
+	HistoryRecorder HistoryRecorder
+
+	namedContexts map[string]llb.State
+	stages        map[string]Stage
+	stageName     string
+	started       bool
+	createdAt     *time.Time
+	constraints   []llb.ConstraintsOpt
+}
+
+// Stage is a named, immutable snapshot that can be used by a later FROM or
+// COPY --from instruction.
+type Stage struct {
+	Name     string
+	State    llb.State
+	Image    dockerspec.DockerOCIImage
+	Platform ocispecs.Platform
+}
+
+// Result is the output of a completed build sequence.
+type Result struct {
+	State    llb.State
+	Image    dockerspec.DockerOCIImage
+	Platform ocispecs.Platform
+	Stages   map[string]Stage
+}
+
+// New creates a Build with an empty root filesystem and the host platform.
+// Configure the target platform and contexts with BuildOptions as needed.
+func New(opts ...BuildOption) *Build {
+	p := ocispecs.Platform{OS: runtime.GOOS, Architecture: runtime.GOARCH}
+	b := &Build{
+		Platform:      p,
+		State:         llb.Scratch().Platform(p),
+		Image:         emptyImage(p),
+		BuildContext:  llb.Local("context"),
+		BuildArgs:     make(map[string]string),
+		namedContexts: make(map[string]llb.State),
+		stages:        make(map[string]Stage),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(b)
+		}
+	}
+	b.State = b.State.Platform(b.Platform)
+	b.Image.OS = b.Platform.OS
+	b.Image.Architecture = b.Platform.Architecture
+	b.Image.Variant = b.Platform.Variant
+	return b
+}
+
+// WithPlatform sets the target platform for the build.
+func WithPlatform(platform ocispecs.Platform) BuildOption {
+	return func(b *Build) {
+		b.Platform = platform
+		b.State = b.State.Platform(platform)
+	}
+}
+
+// WithBuildContext sets the default local state used by COPY and local ADD.
+func WithBuildContext(state llb.State) BuildOption {
+	return func(b *Build) { b.BuildContext = state }
+}
+
+// WithBuildArgs supplies build-time argument values. Instruction-level ARG
+// declarations still control which values are made available to the build.
+func WithBuildArgs(args map[string]string) BuildOption {
+	return func(b *Build) {
+		for key, value := range args {
+			b.BuildArgs[key] = value
+		}
+	}
+}
+
+// WithImageResolver installs the callback used to obtain base-image metadata.
+func WithImageResolver(resolve ImageResolver) BuildOption {
+	return func(b *Build) { b.ImageResolver = resolve }
+}
+
+// WithNamedContext registers a named BuildKit context usable by FROM and
+// COPY --from. A later registration replaces the earlier one.
+func WithNamedContext(name string, state llb.State) BuildOption {
+	return func(b *Build) { b.namedContexts[name] = state }
+}
+
+// WithCreatedAt fixes the timestamp written to image history. This is useful
+// for reproducible image metadata.
+func WithCreatedAt(t time.Time) BuildOption {
+	return func(b *Build) {
+		t := t
+		b.createdAt = &t
+	}
+}
+
+// WithHistoryRecorder installs a callback invoked for each history entry.
+func WithHistoryRecorder(recorder HistoryRecorder) BuildOption {
+	return func(b *Build) { b.HistoryRecorder = recorder }
+}
+
+// WithConstraints adds constraints to LLB operations created by instructions.
+func WithConstraints(opts ...llb.ConstraintsOpt) BuildOption {
+	return func(b *Build) { b.constraints = append(b.constraints, opts...) }
+}
+
+// Apply executes instructions sequentially. The first error stops the build.
+func (b *Build) Apply(ctx context.Context, instructions ...Instruction) error {
+	if b == nil {
+		return fmt.Errorf("dockerfile: nil build")
+	}
+	for index, instruction := range instructions {
+		if instruction == nil {
+			return fmt.Errorf("dockerfile: instruction %d is nil", index)
+		}
+		if err := instruction(ctx, b); err != nil {
+			return fmt.Errorf("dockerfile: instruction %d: %w", index+1, err)
+		}
+	}
+	return nil
+}
+
+// Result returns a detached snapshot of the current state, image and named stages.
+func (b *Build) Result() Result {
+	stages := make(map[string]Stage, len(b.stages))
+	for name, stage := range b.stages {
+		stages[name] = Stage{
+			Name: stage.Name, State: stage.State,
+			Image: cloneImage(stage.Image), Platform: clonePlatform(stage.Platform),
+		}
+	}
+	return Result{
+		State: b.State, Image: cloneImage(b.Image),
+		Platform: clonePlatform(b.Platform), Stages: stages,
+	}
+}
+
+// Stage returns a previously completed named stage.
+func (b *Build) Stage(name string) (Stage, bool) {
+	stage, ok := b.stages[name]
+	if !ok {
+		return Stage{}, false
+	}
+	stage.Image = cloneImage(stage.Image)
+	stage.Platform = clonePlatform(stage.Platform)
+	return stage, true
+}
+
+func (b *Build) saveStage() {
+	if !b.started || b.stageName == "" {
+		return
+	}
+	b.stages[b.stageName] = Stage{
+		Name: b.stageName, State: b.State,
+		Image: cloneImage(b.Image), Platform: clonePlatform(b.Platform),
+	}
+}
+
+func (b *Build) requireStage(instruction string) error {
+	if !b.started {
+		return fmt.Errorf("%s must follow FROM", instruction)
+	}
+	return nil
+}
+
+func (b *Build) expand(value string) string {
+	return expandVariables(value, b.BuildArgs, b.Image.Config.Env)
+}
+
+func (b *Build) recordHistory(ctx context.Context, createdBy string, emptyLayer bool) error {
+	if !b.started {
+		return nil
+	}
+	if !emptyLayer {
+		createdBy += " # buildkit"
+	}
+	var created *time.Time
+	if b.createdAt != nil {
+		t := *b.createdAt
+		created = &t
+	}
+	entry := ocispecs.History{
+		Created: created, CreatedBy: createdBy,
+		Author: b.Image.Author, EmptyLayer: emptyLayer,
+	}
+	b.Image.History = append(b.Image.History, entry)
+	if b.Image.Created == nil && created != nil {
+		t := *created
+		b.Image.Created = &t
+	}
+	if b.HistoryRecorder != nil {
+		return b.HistoryRecorder(ctx, entry)
+	}
+	return nil
+}
+
+func emptyImage(platform ocispecs.Platform) dockerspec.DockerOCIImage {
+	image := dockerspec.DockerOCIImage{}
+	image.OS = platform.OS
+	image.Architecture = platform.Architecture
+	image.Variant = platform.Variant
+	image.OSVersion = platform.OSVersion
+	image.OSFeatures = slices.Clone(platform.OSFeatures)
+	image.RootFS.Type = "layers"
+	image.Config.WorkingDir = "/"
+	return image
+}
+
+func cloneImage(src dockerspec.DockerOCIImage) dockerspec.DockerOCIImage {
+	dst := src
+	dst.OSFeatures = slices.Clone(src.OSFeatures)
+	dst.RootFS.DiffIDs = slices.Clone(src.RootFS.DiffIDs)
+	dst.History = slices.Clone(src.History)
+	dst.Config.Env = slices.Clone(src.Config.Env)
+	dst.Config.Entrypoint = slices.Clone(src.Config.Entrypoint)
+	dst.Config.Cmd = slices.Clone(src.Config.Cmd)
+	dst.Config.Shell = slices.Clone(src.Config.Shell)
+	dst.Config.OnBuild = slices.Clone(src.Config.OnBuild)
+	dst.Config.ExposedPorts = maps.Clone(src.Config.ExposedPorts)
+	dst.Config.Volumes = maps.Clone(src.Config.Volumes)
+	dst.Config.Labels = maps.Clone(src.Config.Labels)
+	if src.Created != nil {
+		t := *src.Created
+		dst.Created = &t
+	}
+	if src.Config.Healthcheck != nil {
+		health := *src.Config.Healthcheck
+		health.Test = slices.Clone(src.Config.Healthcheck.Test)
+		dst.Config.Healthcheck = &health
+	}
+	return dst
+}
+
+func clonePlatform(src ocispecs.Platform) ocispecs.Platform {
+	dst := src
+	dst.OSFeatures = slices.Clone(src.OSFeatures)
+	return dst
+}
