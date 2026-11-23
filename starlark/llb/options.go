@@ -105,6 +105,7 @@ func optionBuiltins() map[string]starlark.Value {
 		}, 2, 2, "ImageBlobOption"),
 		"Checksum": optionBuiltin("Checksum", checksumOption, 1, 1, "HTTPOption"),
 		"HTTPChecksum": optionBuiltin("HTTPChecksum", checksumOption, 1, 1, "HTTPOption"),
+		"OCIChecksum": optionBuiltin("OCIChecksum", ociChecksumOption, 1, 1, "OCILayoutOption"),
 		"WithImageChecksum": optionBuiltin("WithImageChecksum", imageChecksumOption, 1, 1, "ImageOption"),
 		"WithLayerLimit": intOption("WithLayerLimit", "ImageOption", buildkitllb.WithLayerLimit),
 		"ResolveDigest": boolOption("ResolveDigest", "ImageOption", buildkitllb.ResolveDigest),
@@ -201,6 +202,20 @@ func optionBuiltins() map[string]starlark.Value {
 		"WithExcludePatterns": stringListOption("WithExcludePatterns", "CopyOption", buildkitllb.WithExcludePatterns),
 		"ChmodMode": intOption("ChmodMode", "CopyOption", func(n int) buildkitllb.CopyOption { return buildkitllb.ChmodOpt{Mode: os.FileMode(n)} }),
 		"ChmodSymbolic": stringOption("ChmodSymbolic", "CopyOption", func(s string) buildkitllb.CopyOption { return buildkitllb.ChmodOpt{ModeStr: s} }),
+		"CreatedTime": optionBuiltin("WithCreatedTime", createdTimeOption, 1, 1, "CreatedTime"),
+		"WithCreatedTime": optionBuiltin("WithCreatedTime", createdTimeOption, 1, 1, "CreatedTime"),
+	}
+}
+
+func createdTimeOption(a starlark.Tuple) (any, error) {
+	raw, err := stringAt("WithCreatedTime", a, 0)
+	if err != nil { return nil, err }
+	t, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil { return nil, fmt.Errorf("WithCreatedTime: %w", err) }
+	return buildkitllb.WithCreatedTime(t), nil
+}
+
+/*
 		"CreatedTime": optionBuiltin("WithCreatedTime", func(a starlark.Tuple) (any, error) {
 			raw, err := stringAt("WithCreatedTime", a, 0); if err != nil { return nil, err }
 			t, err := time.Parse(time.RFC3339Nano, raw); if err != nil { return nil, fmt.Errorf("WithCreatedTime: %w", err) }
@@ -208,6 +223,7 @@ func optionBuiltins() map[string]starlark.Value {
 		}, 1, 1, "CreatedTime"),
 	}
 }
+*/
 
 func optionBuiltin(name string, build func(starlark.Tuple) (any, error), min, max int, kind string) starlark.Value {
 	return builtin(name, func(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -334,4 +350,13 @@ func withProxyOption(a starlark.Tuple) (any, error) {
 	proxy, ok := a[0].(*proxyEnvValue)
 	if !ok || proxy == nil { return nil, fmt.Errorf("WithProxy: got %s, want llb.ProxyEnv", valueType(a[0])) }
 	return buildkitllb.WithProxy(proxy.proxy), nil
+}
+
+
+func ociChecksumOption(a starlark.Tuple) (any, error) {
+	raw, err := stringAt("OCIChecksum", a, 0)
+	if err != nil { return nil, err }
+	d, err := digest.Parse(raw)
+	if err != nil { return nil, fmt.Errorf("OCIChecksum: %w", err) }
+	return buildkitllb.OCIChecksum(d), nil
 }
