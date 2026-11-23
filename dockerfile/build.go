@@ -56,6 +56,7 @@ type Build struct {
 	constraints   []llb.ConstraintsOpt
 	globalArgs    map[string]string
 	stageArgs     map[string]string
+	stageEnv      map[string]string
 }
 
 // Stage is a named, immutable snapshot that can be used by a later FROM or
@@ -66,6 +67,7 @@ type Stage struct {
 	Image    dockerspec.DockerOCIImage
 	Platform ocispecs.Platform
 	Args     map[string]string
+	BuildEnv map[string]string
 }
 
 // Result is the output of a completed build sequence.
@@ -88,6 +90,7 @@ func New(opts ...BuildOption) *Build {
 		BuildArgs:     make(map[string]string),
 		globalArgs:    make(map[string]string),
 		stageArgs:     make(map[string]string),
+		stageEnv:      make(map[string]string),
 		namedContexts: make(map[string]llb.State),
 		stages:        make(map[string]Stage),
 	}
@@ -207,7 +210,7 @@ func (b *Build) currentStage() Stage {
 	return Stage{
 		Name: b.stageName, State: b.State,
 		Image: cloneImage(b.Image), Platform: clonePlatform(b.Platform),
-		Args: maps.Clone(b.stageArgs),
+		Args: maps.Clone(b.stageArgs), BuildEnv: maps.Clone(b.stageEnv),
 	}
 }
 
@@ -241,7 +244,7 @@ func (b *Build) requireStage(instruction string) error {
 }
 
 func (b *Build) expand(value string) string {
-	return expandVariables(value, b.stageArgs, b.Image.Config.Env)
+	return expandVariables(value, b.stageEnv, nil)
 }
 
 func (b *Build) expandGlobal(value string) string {
@@ -284,7 +287,7 @@ func cloneStage(src Stage) Stage {
 	return Stage{
 		Name: src.Name, State: src.State,
 		Image: cloneImage(src.Image), Platform: clonePlatform(src.Platform),
-		Args: maps.Clone(src.Args),
+		Args: maps.Clone(src.Args), BuildEnv: maps.Clone(src.BuildEnv),
 	}
 }
 
