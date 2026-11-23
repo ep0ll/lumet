@@ -151,15 +151,12 @@ func resolveAddSource(b *Build, source AddSource, options InstructionOptions) (l
 		if source.Value == "" {
 			return llb.State{}, "", fmt.Errorf("Git remote cannot be empty")
 		}
+		if source.Checksum != "" || options.AddChecksum != "" {
+			return llb.State{}, "", fmt.Errorf("Git ADD does not use an HTTP digest; pin the ref or pass llb.GitChecksum through GitSource")
+		}
 		gitOptions := append([]llb.GitOption(nil), source.GitOptions...)
 		if options.KeepGitDir {
 			gitOptions = append(gitOptions, llb.KeepGitDir())
-		}
-		if source.Checksum != "" {
-			gitOptions = append(gitOptions, llb.GitChecksum(source.Checksum.String()))
-		}
-		if options.AddChecksum != "" {
-			gitOptions = append(gitOptions, llb.GitChecksum(options.AddChecksum.String()))
 		}
 		if source.Subdir != "" {
 			gitOptions = append(gitOptions, llb.GitSubDir(source.Subdir))
