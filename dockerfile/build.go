@@ -231,6 +231,9 @@ func (b *Build) lookupStage(name string) (Stage, bool) {
 }
 
 func (b *Build) requireStage(instruction string) error {
+	if b == nil {
+		return fmt.Errorf("%s: nil build", instruction)
+	}
 	if !b.started {
 		return fmt.Errorf("%s must follow FROM", instruction)
 	}
