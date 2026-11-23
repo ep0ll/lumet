@@ -13,6 +13,7 @@ import (
 
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/util/system"
+	"github.com/ep0ll/lumet/dockerfile/expand"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 )
 
@@ -201,7 +202,7 @@ func Env(values ...KeyValue) Instruction {
 			if item.Key == "" {
 				return fmt.Errorf("ENV: key cannot be empty")
 			}
-			value := expandVariablesWithEscape(item.Value, previousEnv, b.EscapeToken)
+			value := b.expandMap(item.Value, previousEnv)
 			b.State = b.State.AddEnv(item.Key, value)
 			b.Image.Config.Env = setEnv(b.Image.Config.Env, item.Key, value)
 			b.stageEnv[item.Key] = value
