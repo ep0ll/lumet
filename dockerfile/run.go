@@ -19,6 +19,9 @@ func Run(command Command, opts ...Option) Instruction {
 		}
 		b.progressGroup = options.ProgressGroup
 		b.progressTitle = options.ProgressTitle
+		if b.progressTitle == "" {
+			b.progressTitle = "RUN " + formatCommand(command)
+		}
 		args, err := commandArgs(command, b.Image.Config.Shell, b.Platform.OS)
 		if err != nil {
 			return fmt.Errorf("RUN: %w", err)
