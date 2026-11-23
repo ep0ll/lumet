@@ -289,3 +289,15 @@ func Members() starlark.StringDict {
 func builtin(name string, fn func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error)) *starlark.Builtin {
 	return starlark.NewBuiltin(starlarkllb.SnakeCaseIdentifier(name), fn)
 }
+
+
+// WrapSourceOp adapts the solver protobuf source operation returned by
+// gateway/client.MetaResponse. This is distinct from llb.SourceOpValue.
+func WrapSourceOp(op *pb.SourceOp) *SourceOpValue {
+	return &SourceOpValue{op: op}
+}
+
+// UnwrapOpt extracts the native BuildKit sourceresolver.Opt created by opt().
+func UnwrapOpt(value starlark.Value) (buildkitsourceresolver.Opt, error) {
+	return recordFrom[buildkitsourceresolver.Opt](value, "opt")
+}
