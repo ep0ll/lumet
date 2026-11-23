@@ -194,7 +194,7 @@ func Env(values ...KeyValue) Instruction {
 			if item.Key == "" {
 				return fmt.Errorf("ENV: key cannot be empty")
 			}
-			value := expandVariables(item.Value, b.stageArgs, previousEnv)
+			value := expandVariables(item.Value, previousEnv, nil)
 			b.State = b.State.AddEnv(item.Key, value)
 			b.Image.Config.Env = setEnv(b.Image.Config.Env, item.Key, value)
 			b.stageEnv[item.Key] = value
