@@ -7,6 +7,7 @@ import (
 
 	buildkitllb "github.com/moby/buildkit/client/llb"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/moby/buildkit/util/apicaps"
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
 )
@@ -457,10 +458,40 @@ func compactStrings(values []string) []string {
 }
 
 func stateBuiltins() map[string]starlark.Value {
-	return map[string]starlark.Value{
+	members := map[string]starlark.Value{
 		"NewState": builtin("NewState", newStateBuiltin),
 		"NewConstraints": builtin("NewConstraints", newConstraintsBuiltin),
 		"OCIPlatform": builtin("OCIPlatform", ociPlatformBuiltin),
+	}
+	for name, value := range stateConstraintBuiltins() {
+		if _, exists := members[name]; exists { panic("starlark/llb: duplicate state builtin " + name) }
+		members[name] = value
+	}
+	return members
+}
+
+func stateConstraintBuiltins() map[string]starlark.Value {
+	return map[string]starlark.Value{
+		"WithDescription": builtin("WithDescription", withDescriptionBuiltin),
+		"WithCustomName": stringOptionBuiltin("WithCustomName", "ConstraintsOpt", buildkitllb.WithCustomName),
+		"WithCustomNamef": builtin("WithCustomNamef", withCustomNamefBuiltin),
+		"WithExportCache": builtin("WithExportCache", withExportCacheBuiltin),
+		"WithoutExportCache": builtin("WithoutExportCache", withoutExportCacheBuiltin),
+		"WithoutDefaultExportCache": builtin("WithoutDefaultExportCache", withoutDefaultExportCacheBuiltin),
+		"WithLinuxResources": builtin("WithLinuxResources", withLinuxResourcesBuiltin),
+		"Platform": builtin("Platform", platformConstraintBuiltin),
+		"LocalUniqueID": stringOptionBuiltin("LocalUniqueID", "ConstraintsOpt", buildkitllb.LocalUniqueID),
+		"ProgressGroup": builtin("ProgressGroup", progressGroupBuiltin),
+		"MemoryLimit": int64OptionBuiltin("MemoryLimit", "ConstraintsOpt", buildkitllb.MemoryLimit),
+		"MemorySwapLimit": int64OptionBuiltin("MemorySwapLimit", "ConstraintsOpt", buildkitllb.MemorySwapLimit),
+		"CPUShares": uint64OptionBuiltin("CPUShares", "ConstraintsOpt", buildkitllb.CPUShares),
+		"CPUPeriod": uint64OptionBuiltin("CPUPeriod", "ConstraintsOpt", buildkitllb.CPUPeriod),
+		"CPUQuota": int64OptionBuiltin("CPUQuota", "ConstraintsOpt", buildkitllb.CPUQuota),
+		"CpusetCpus": stringOptionBuiltin("CpusetCpus", "ConstraintsOpt", buildkitllb.CpusetCpus),
+		"CpusetMems": stringOptionBuiltin("CpusetMems", "ConstraintsOpt", buildkitllb.CpusetMems),
+		"Require": builtin("Require", requireBuiltin),
+		"WithCaps": builtin("WithCaps", withCapsBuiltin),
+		"OpMetadata": builtin("OpMetadata", opMetadataBuiltin),
 	}
 }
 
@@ -549,3 +580,132 @@ var (
 	_ starlark.Value     = (*OCIPlatformValue)(nil)
 	_ starlark.HasAttrs  = (*OCIPlatformValue)(nil)
 )
+
+
+func withDescriptionBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := arity("WithDescription", args, kwargs, 1, 1); err != nil { return nil, err }
+	values, err := stringDict(args[0], "WithDescription")
+	if err != nil { return nil, err }
+	return wrapOption("ConstraintsOpt", buildkitllb.WithDescription(values)), nil
+}
+
+func withCustomNamefBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := arity("WithCustomNamef", args, kwargs, 1, -1); err != nil { return nil, err }
+	format, err := stringAt("WithCustomNamef", args, 0)
+	if err != nil { return nil, err }
+	values := make([]any, 0, len(args)-1)
+	for _, arg := range args[1:] { values = append(values, goScalar(arg)) }
+	return wrapOption("ConstraintsOpt", buildkitllb.WithCustomNamef(format, values...)), nil
+}
+
+func withExportCacheBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := arity("WithExportCache", args, kwargs, 0, 0); err != nil { return nil, err }
+	return wrapOption("ConstraintsOpt", buildkitllb.WithExportCache()), nil
+}
+
+func withoutExportCacheBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := arity("WithoutExportCache", args, kwargs, 0, 0); err != nil { return nil, err }
+	return wrapOption("ConstraintsOpt", buildkitllb.WithoutExportCache()), nil
+}
+
+func withoutDefaultExportCacheBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := arity("WithoutDefaultExportCache", args, kwargs, 0, 0); err != nil { return nil, err }
+	return wrapOption("ConstraintsOpt", buildkitllb.WithoutDefaultExportCache()), nil
+}
+
+func withLinuxResourcesBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var resources buildkitllb.LinuxResources
+	if len(args) == 1 && len(kwargs) == 0 {
+		value, ok := args[0].(*LinuxResourcesValue)
+		if !ok || value == nil { return nil, fmt.Errorf("WithLinuxResources: got %s, want llb.LinuxResources", valueType(args[0])) }
+		resources = value.resources
+	} else {
+		if len(args) != 0 { return nil, fmt.Errorf("WithLinuxResources: use either one llb.LinuxResources value or named fields") }
+		if err := starlark.UnpackArgs("WithLinuxResources", args, kwargs,
+			"memory?", &resources.Memory,
+			"memory_swap?", &resources.MemorySwap,
+			"cpu_shares?", &resources.CPUShares,
+			"cpu_period?", &resources.CPUPeriod,
+			"cpu_quota?", &resources.CPUQuota,
+			"cpuset_cpus?", &resources.CpusetCpus,
+			"cpuset_mems?", &resources.CpusetMems,
+		); err != nil { return nil, err }
+	}
+	return wrapOption("ConstraintsOpt", buildkitllb.WithLinuxResources(resources)), nil
+}
+
+func platformConstraintBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var platform ocispecs.Platform
+	if err := starlark.UnpackArgs("Platform", args, kwargs,
+		"os", &platform.OS,
+		"architecture", &platform.Architecture,
+		"variant?", &platform.Variant,
+		"os_version?", &platform.OSVersion,
+		"os_features?", &platform.OSFeatures,
+	); err != nil { return nil, err }
+	return wrapOption("ConstraintsOpt", buildkitllb.Platform(platform)), nil
+}
+
+func progressGroupBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := arity("ProgressGroup", args, kwargs, 3, 3); err != nil { return nil, err }
+	id, err := stringAt("ProgressGroup", args, 0); if err != nil { return nil, err }
+	name, err := stringAt("ProgressGroup", args, 1); if err != nil { return nil, err }
+	weak, err := boolAt("ProgressGroup", args, 2); if err != nil { return nil, err }
+	return wrapOption("ConstraintsOpt", buildkitllb.ProgressGroup(id, name, weak)), nil
+}
+
+func requireBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := arity("Require", args, kwargs, 0, -1); err != nil { return nil, err }
+	var filters []string
+	if len(args) == 1 {
+		if sequence, ok := args[0].(starlark.Indexable); ok {
+			values, err := stringList(sequence); if err != nil { return nil, err }
+			filters = values
+		} else {
+			value, err := stringAt("Require", args, 0); if err != nil { return nil, err }
+			filters = []string{value}
+		}
+	} else {
+		filters = make([]string, len(args))
+		for i := range args {
+			value, err := stringAt("Require", args, i); if err != nil { return nil, err }
+			filters[i] = value
+		}
+	}
+	return wrapOption("ConstraintsOpt", buildkitllb.Require(filters...)), nil
+}
+
+// CapSetValue is an opaque adapter for BuildKit's negotiated API capability set.
+// It can be injected by Go code; Starlark cannot fabricate server capabilities.
+type CapSetValue struct { capSet apicaps.CapSet }
+
+// WrapCapSet adapts a BuildKit API capability set.
+func WrapCapSet(capSet apicaps.CapSet) *CapSetValue { return &CapSetValue{capSet: capSet} }
+
+func (v *CapSetValue) String() string        { return "<llb.CapSet>" }
+func (v *CapSetValue) Type() string          { return "llb.CapSet" }
+func (v *CapSetValue) Freeze()               {}
+func (v *CapSetValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
+func (v *CapSetValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.CapSet") }
+
+func withCapsBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if err := arity("WithCaps", args, kwargs, 1, 1); err != nil { return nil, err }
+	caps, ok := args[0].(*CapSetValue)
+	if !ok || caps == nil { return nil, fmt.Errorf("WithCaps: got %s, want llb.CapSet", valueType(args[0])) }
+	return wrapOption("ConstraintsOpt", buildkitllb.WithCaps(caps.capSet)), nil
+}
+
+func opMetadataBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var metadata buildkitllb.OpMetadata
+	var description starlark.Value
+	if err := starlark.UnpackArgs("OpMetadata", args, kwargs,
+		"ignore_cache?", &metadata.IgnoreCache,
+		"description?", &description,
+	); err != nil { return nil, err }
+	if description != nil && description != starlark.None {
+		values, err := stringDict(description, "OpMetadata.description")
+		if err != nil { return nil, err }
+		metadata.Description = values
+	}
+	return WrapOpMetadata(metadata), nil
+}
