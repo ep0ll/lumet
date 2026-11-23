@@ -13,7 +13,6 @@ import (
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/util/system"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
-	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // KeyValue represents an ENV or LABEL entry.
@@ -56,6 +55,9 @@ func From(reference string, opts ...Option) Instruction {
 		b.saveStage()
 
 		ref := b.expand(reference)
+		if ref == "" && options.baseState == nil {
+			return fmt.Errorf("FROM: image reference cannot be empty")
+		}
 		platform := clonePlatform(b.Platform)
 		if options.platform != nil {
 			platform = clonePlatform(*options.platform)
@@ -98,6 +100,12 @@ func From(reference string, opts ...Option) Instruction {
 				}
 			}
 		}
+
+		image.OS = platform.OS
+		image.Architecture = platform.Architecture
+		image.Variant = platform.Variant
+		image.OSVersion = platform.OSVersion
+		image.OSFeatures = append(image.OSFeatures[:0], platform.OSFeatures...)
 
 		state = state.Platform(platform)
 		if image.Config.User != "" {
@@ -353,11 +361,22 @@ func Healthcheck(command Command, opts ...Option) Instruction {
 		var test []string
 		switch command := command.(type) {
 		case ExecForm:
+			if len(command) == 0 {
+				return fmt.Errorf("HEALTHCHECK: exec form cannot be empty")
+			}
 			test = append([]string{"CMD"}, []string(command)...)
 		case ShellForm:
+			if strings.TrimSpace(string(command)) == "" {
+				return fmt.Errorf("HEALTHCHECK: command cannot be empty")
+			}
 			test = []string{"CMD-SHELL", string(command)}
 		default:
 			return fmt.Errorf("HEALTHCHECK: unsupported command form %T", command)
+		}
+		if options.healthInterval < 0 || options.healthTimeout < 0 ||
+			options.healthStartPeriod < 0 || options.healthStartInterval < 0 ||
+			options.healthRetries < 0 {
+			return fmt.Errorf("HEALTHCHECK: durations and retries cannot be negative")
 		}
 		b.Image.Config.Healthcheck = &dockerspec.HealthcheckConfig{
 			Test: test, Interval: options.healthInterval,
@@ -510,6 +529,5 @@ func expandPorts(value string) ([]string, error) {
 	return result, nil
 }
 
-// keep the standard library signal contract explicit at compile time.
+// Keep the standard-library signal contract explicit at compile time.
 var _ os.Signal = syscall.Signal(0)
-var _ ocispecs.Platform
