@@ -31,6 +31,7 @@ func Copy(sources []string, destination string, opts ...Option) Instruction {
 			return fmt.Errorf("COPY: %w", err)
 		}
 		copyOpts := copyOptions(b, options, false)
+		var action *llb.FileAction
 		for _, source := range sources {
 			source = b.expand(source)
 			sourcePath := rootPath(source)
@@ -38,17 +39,20 @@ func Copy(sources []string, destination string, opts ...Option) Instruction {
 			if options.Parents {
 				target = path.Join(destination, preservedSourcePath(source))
 			}
-
-			if options.Link {
-				copyState := llb.Scratch().Platform(b.Platform).Dir(b.Image.Config.WorkingDir)
-				copyState = copyState.File(llb.Copy(sourceState, sourcePath, target, copyOpts...), combineConstraints(b, options)...)
-				b.State = llb.Merge([]llb.State{b.State, copyState}, combineConstraints(b, options)...)
-				continue
+			if action == nil {
+				action = llb.Copy(sourceState, sourcePath, target, copyOpts...)
+			} else {
+				action = action.Copy(sourceState, sourcePath, target, copyOpts...)
 			}
-			b.State = b.State.File(
-				llb.Copy(sourceState, sourcePath, target, copyOpts...),
-				combineConstraints(b, options)...,
-			)
+		}
+
+		constraints := combineConstraints(b, options)
+		if options.Link {
+			copyState := llb.Scratch().Platform(b.Platform).Dir(b.Image.Config.WorkingDir)
+			copyState = copyState.File(action, constraints...)
+			b.State = llb.Merge([]llb.State{b.State, copyState}, constraints...)
+		} else {
+			b.State = b.State.File(action, constraints...)
 		}
 		return b.recordHistory(ctx, "COPY "+strings.Join(sources, " ")+" "+destination, false)
 	}
@@ -70,6 +74,7 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 			return fmt.Errorf("ADD: destination cannot be empty")
 		}
 
+		var action *llb.FileAction
 		for _, source := range sources {
 			state, sourcePath, err := resolveAddSource(b, source, options)
 			if err != nil {
@@ -83,11 +88,13 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 				unpack = *options.Unpack
 			}
 			copyOpts := copyOptions(b, options, unpack)
-			b.State = b.State.File(
-				llb.Copy(state, sourcePath, destination, copyOpts...),
-				combineConstraints(b, options)...,
-			)
+			if action == nil {
+				action = llb.Copy(state, sourcePath, destination, copyOpts...)
+			} else {
+				action = action.Copy(state, sourcePath, destination, copyOpts...)
+			}
 		}
+		b.State = b.State.File(action, combineConstraints(b, options)...)
 		descriptions := make([]string, 0, len(sources))
 		for _, source := range sources {
 			descriptions = append(descriptions, source.Value)
