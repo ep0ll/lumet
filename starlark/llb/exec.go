@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	buildkitllb "github.com/moby/buildkit/client/llb"
-	"github.com/moby/buildkit/solver/pb"
 	"go.starlark.net/starlark"
 )
 
