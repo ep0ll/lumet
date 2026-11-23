@@ -4,8 +4,6 @@ package sourceresolver
 
 import (
 	"fmt"
-	"time"
-
 	starlarkllb "github.com/ep0ll/lumet/starlark/llb"
 	buildkitsourceresolver "github.com/moby/buildkit/client/llb/sourceresolver"
 	"github.com/moby/buildkit/solver/pb"
@@ -236,7 +234,7 @@ func checksumAlgoValues()map[string]starlark.Value{
 		"ResolveHTTPChecksumAlgoSHA512":starlark.MakeInt(int(buildkitsourceresolver.ResolveHTTPChecksumAlgoSHA512)),
 	}
 }
-func builtins()map[string]starlark.Value{
+func sourceResolverTypesBuiltins()map[string]starlark.Value{
 	return map[string]starlark.Value{
 		"SourceOp":builtin("SourceOp",sourceOpBuiltin),
 		"Opt":builtin("Opt",optBuiltin),
@@ -246,5 +244,33 @@ func builtins()map[string]starlark.Value{
 		"ResolveOCILayoutOpt":builtin("ResolveOCILayoutOpt",resolveOCILayoutOptBuiltin),
 		"ResolveImageConfigOptStore":builtin("ResolveImageConfigOptStore",resolveImageConfigStoreBuiltin),
 		"ResolveHTTPChecksumRequest":builtin("ResolveHTTPChecksumRequest",resolveHTTPChecksumRequestBuiltin),
+	}
+}
+
+func newModule() *starlarkstruct.Module {
+	members:=builtins()
+	for name,value:=range resolverTypeValues(){members[name]=value}
+	for name,value:=range checksumAlgoValues(){members[name]=value}
+	module:=&starlarkstruct.Module{Name:"sourceresolver",Members:members}
+	module.Freeze()
+	return module
+}
+
+// Module is the frozen Starlark module for BuildKit's sourceresolver API.
+var Module=newModule()
+
+// Load resolves the sourceresolver submodule.
+func Load(_ *starlark.Thread,name string)(starlark.StringDict,error){
+	switch name {
+	case "llb/sourceresolver","llb/sourceresolver.star","sourceresolver","sourceresolver.star":
+		return Module.Members,nil
+	default:
+		return nil,fmt.Errorf("sourceresolver: unknown module %q",name)
+	}
+}
+
+func init(){
+	if err:=starlarkllb.RegisterModule("llb/sourceresolver",Module.Members);err!=nil{
+		panic(err)
 	}
 }
