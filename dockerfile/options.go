@@ -16,6 +16,7 @@ type Option func(*instructionOptions)
 type instructionOptions struct {
 	stageName   string
 	platform    *ocispecs.Platform
+	baseState   *llb.State
 	image       []llb.ImageOption
 	run         []llb.RunOption
 	copy        []llb.CopyOption
@@ -53,6 +54,14 @@ func OnPlatform(platform ocispecs.Platform) Option {
 	return func(o *instructionOptions) {
 		p := platform
 		o.platform = &p
+	}
+}
+
+// FromState uses an explicit LLB state as the base for FROM.
+func FromState(state llb.State) Option {
+	return func(o *instructionOptions) {
+		s := state
+		o.baseState = &s
 	}
 }
 
