@@ -42,6 +42,7 @@ func newModule() *starlarkstruct.Module {
 	for _, group := range [][]map[string]starlark.Value{
 		{
 			platformConstraintValues(),
+			stateConstraintValues(),
 			networkModeValues(),
 			securityModeValues(),
 			cacheMountSharingValues(),
@@ -259,6 +260,3 @@ func callContext(thread *starlark.Thread) context.Context {
 	return context.Background()
 }
 
-var (
-	_ starlarkstruct.HasAttrs = Module
-)
