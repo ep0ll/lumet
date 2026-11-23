@@ -3,7 +3,6 @@ package llb
 import (
 	"fmt"
 	"os"
-	"sort"
 	"time"
 
 	buildkitllb "github.com/moby/buildkit/client/llb"
@@ -373,4 +372,3 @@ var (
 	_ starlark.HasAttrs = (*FileOpValue)(nil)
 )
 
-var _ = sort.Strings
