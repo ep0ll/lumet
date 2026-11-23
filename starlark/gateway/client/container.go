@@ -166,11 +166,17 @@ type StartRequestValue struct {
 	request gwclient.StartRequest
 	stdout *lockedBuffer
 	stderr *lockedBuffer
+	secretEnvValue starlark.Value
+	stdinValue starlark.Value
 }
 
 func (v *StartRequestValue) String() string { return "<gateway.client.start_request>" }
 func (v *StartRequestValue) Type() string { return "gateway.client.start_request" }
-func (v *StartRequestValue) Freeze() {}
+func (v *StartRequestValue) Freeze() {
+	if v != nil && v.secretEnvValue != nil {
+		v.secretEnvValue.Freeze()
+	}
+}
 func (v *StartRequestValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
 func (v *StartRequestValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: gateway.client.start_request") }
 func (v *StartRequestValue) Attr(name string) (starlark.Value, error) {
@@ -178,6 +184,12 @@ func (v *StartRequestValue) Attr(name string) (starlark.Value, error) {
 	switch name {
 	case "args": return stringListValue(v.request.Args), nil
 	case "env": return stringListValue(v.request.Env), nil
+	case "secret_env":
+		if v.secretEnvValue == nil { return starlark.None, nil }
+		return v.secretEnvValue, nil
+	case "stdin":
+		if v.stdinValue == nil { return starlark.None, nil }
+		return v.stdinValue, nil
 	case "user": return starlark.String(v.request.User), nil
 	case "cwd": return starlark.String(v.request.Cwd), nil
 	case "tty": return starlark.Bool(v.request.Tty), nil
@@ -189,7 +201,7 @@ func (v *StartRequestValue) Attr(name string) (starlark.Value, error) {
 	}
 }
 func (v *StartRequestValue) AttrNames() []string {
-	return []string{"args", "cwd", "env", "remove_mount_stubs_recursive", "security_mode", "stderr", "stdout", "tty", "user"}
+	return []string{"args", "cwd", "env", "remove_mount_stubs_recursive", "secret_env", "security_mode", "stderr", "stdin", "stdout", "tty", "user"}
 }
 
 func startRequestBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -230,7 +242,7 @@ func startRequestBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.
 	}
 	stdout, stderr := &lockedBuffer{}, &lockedBuffer{}
 	req.Stdout, req.Stderr = stdout, stderr
-	return &StartRequestValue{request: req, stdout: stdout, stderr: stderr}, nil
+	return &StartRequestValue{request: req, stdout: stdout, stderr: stderr, secretEnvValue: secretEnvValue, stdinValue: stdinValue}, nil
 }
 
 type ContainerProcessValue struct {
