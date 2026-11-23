@@ -184,12 +184,25 @@ The resulting `CopyInput` wrapper can be used only as the input to another
 
 ### Constraints and state options
 
-`WithCustomName`, `WithExportCache`, `WithoutExportCache`,
-`WithoutDefaultExportCache`, `WithDescription`, `Platform`, `CPUPeriod`,
-`CPUQuota`, `CPUShares`, `CpusetCpus`, `CpusetMems`, `LocalUniqueID`,
-`MemoryLimit`, `MemorySwapLimit`, `ProgressGroup`, `Require`, `Network`,
-`Security`, `AddEnv`, `AddEnvf`, `DelEnv`, `Dir`, `Dirf`, `User`,
+`WithCustomName`, `WithCustomNamef`, `WithExportCache`,
+`WithoutExportCache`, `WithoutDefaultExportCache`, `WithDescription`,
+`WithLinuxResources`, `Platform`, `CPUPeriod`, `CPUQuota`, `CPUShares`,
+`CpusetCpus`, `CpusetMems`, `LocalUniqueID`, `MemoryLimit`,
+`MemorySwapLimit`, `ProgressGroup`, `Require`, `Network`, `Security`,
+`Reset`, `AddEnv`, `AddEnvf`, `DelEnv`, `Dir`, `Dirf`, `User`,
 `Hostname`.
+
+`WithLinuxResources` accepts keyword arguments `memory`, `memory_swap`,
+`cpu_shares`, `cpu_period`, `cpu_quota`, `cpuset_cpus`, and
+`cpuset_mems`. For example:
+```python
+state.marshal(WithLinuxResources(memory = 1073741824, cpu_shares = 512))
+```
+
+Most thin wrappers for BuildKit options accept positional arguments, mirroring
+the corresponding Go function. Constructors that need structured input (such
+as `Platform`, `OCIPlatform`, `ProxyEnv`, `Header`, and
+`WithLinuxResources`) accept named keyword arguments.
 
 ### Image, Git, local, HTTP and OCI source options
 
