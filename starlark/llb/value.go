@@ -28,7 +28,7 @@ func (v *StateValue) Unwrap() buildkitllb.State {
 func (v *StateValue) String() string        { return "<llb.State>" }
 func (v *StateValue) Type() string          { return "llb.State" }
 func (v *StateValue) Freeze()               {}
-func (v *StateValue) Truth() starlark.Bool  { return v != nil }
+func (v *StateValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
 func (v *StateValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.State") }
 
 // ExecStateValue represents the result of State.Run. BuildKit's ExecState
@@ -69,7 +69,7 @@ func (v *FileActionValue) Unwrap() *buildkitllb.FileAction {
 func (v *FileActionValue) String() string        { return "<llb.FileAction>" }
 func (v *FileActionValue) Type() string          { return "llb.FileAction" }
 func (v *FileActionValue) Freeze()               {}
-func (v *FileActionValue) Truth() starlark.Bool  { return v != nil && v.action != nil }
+func (v *FileActionValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.action != nil) }
 func (v *FileActionValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.FileAction") }
 
 // optionValue carries a native, typed BuildKit option. The Starlark-facing
@@ -85,7 +85,7 @@ func (v *optionValue) String() string {
 }
 func (v *optionValue) Type() string          { return "llb." + v.kind }
 func (v *optionValue) Freeze()               {}
-func (v *optionValue) Truth() starlark.Bool  { return v != nil && v.value != nil }
+func (v *optionValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.value != nil) }
 func (v *optionValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: %s", v.Type()) }
 
 // stateFromValue validates and unwraps a Starlark LLB state.
