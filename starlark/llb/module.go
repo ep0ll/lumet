@@ -80,7 +80,7 @@ func Exec(ctx context.Context, filename string, src any, predeclared starlark.St
 		predeclared = starlark.StringDict{}
 	}
 	thread := NewThread(ctx)
-	return starlark.ExecFileOptions(syntax.LegacyFileOptions(), thread, filename, src, predeclared)
+	return starlark.ExecFileOptions(&syntax.FileOptions{}, thread, filename, src, predeclared)
 }
 
 // Predeclared returns a fresh dictionary containing the "llb" module.
