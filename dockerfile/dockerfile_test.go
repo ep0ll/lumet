@@ -201,3 +201,44 @@ func TestInstructionOptionsCanBeExtended(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+
+func TestArgScopeAcrossStages(t *testing.T) {
+	ctx := context.Background()
+	platform := ocispecs.Platform{OS: "linux", Architecture: "amd64"}
+	var resolvedReference string
+	build := New(
+		WithPlatform(platform),
+		WithBuildArgs(map[string]string{
+			"BASE_IMAGE": "example/base:1.0",
+		}),
+		WithImageResolver(func(_ context.Context, reference string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
+			resolvedReference = reference
+			return emptyImage(platform), nil
+		}),
+	)
+
+	err := build.Apply(ctx,
+		Arg("BASE_IMAGE", ArgDefault("example/fallback:latest")),
+		From("$BASE_IMAGE", As("build")),
+		Arg("BUILD_ONLY", ArgDefault("secret")),
+		Env(KV("PUBLIC_VALUE", "visible")),
+		From("build", As("runtime")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolvedReference != "example/base:1.0" {
+		t.Fatalf("FROM did not use global ARG: %q", resolvedReference)
+	}
+	if _, ok, err := build.State.GetEnv(ctx, "BUILD_ONLY"); err != nil {
+		t.Fatal(err)
+	} else if ok {
+		t.Fatal("stage-local ARG leaked into the next stage")
+	}
+	if value, ok, err := build.State.GetEnv(ctx, "PUBLIC_VALUE"); err != nil {
+		t.Fatal(err)
+	} else if !ok || value != "visible" {
+		t.Fatalf("ENV should survive FROM from a previous stage: value=%q present=%v", value, ok)
+	}
+}
