@@ -3,12 +3,12 @@ package llb
 import (
 	"context"
 	"fmt"
-	"net"
 	"sort"
 
 	buildkitllb "github.com/moby/buildkit/client/llb"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.starlark.net/starlark"
+	"go.starlark.net/starlarkstruct"
 )
 
 // StateValue is the immutable Starlark representation of BuildKit's llb.State.
@@ -278,7 +278,7 @@ func stringDictValue(values map[string]string) starlark.Value {
 }
 
 func starlarkstructValue(name string, values starlark.StringDict) starlark.Value {
-	return starlarkstructFromStringDict(name, values)
+	return starlarkstruct.FromStringDict(starlark.String(name), values)
 }
 
 func (v *StateValue) Attr(name string) (starlark.Value, error) {
@@ -548,5 +548,4 @@ var (
 	_ starlark.HasAttrs  = (*OpMetadataValue)(nil)
 	_ starlark.Value     = (*OCIPlatformValue)(nil)
 	_ starlark.HasAttrs  = (*OCIPlatformValue)(nil)
-	_ net.IP              // keep net types referenced by this file's API inventory.
 )
