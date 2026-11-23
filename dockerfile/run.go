@@ -34,6 +34,6 @@ func Run(command Command, opts ...Option) Instruction {
 		runOptions = append(runOptions, options.Constraints...)
 
 		b.State = b.State.Run(runOptions...).Root()
-		return b.recordHistory(ctx, "RUN "+strings.Join(args, " "), false)
+		return b.recordHistory(ctx, "RUN "+strings.Join(args, " ")+" # buildkit", false)
 	}
 }
