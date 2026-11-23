@@ -239,6 +239,7 @@ func startRequestBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.
 		data, err := bytesAt("start_request.stdin", stdinValue)
 		if err != nil { return nil, err }
 		req.Stdin = io.NopCloser(bytes.NewReader(data))
+		stdinValue = starlark.Bytes(append([]byte(nil), data...))
 	}
 	stdout, stderr := &lockedBuffer{}, &lockedBuffer{}
 	req.Stdout, req.Stderr = stdout, stderr
