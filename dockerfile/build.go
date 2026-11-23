@@ -65,6 +65,7 @@ type Stage struct {
 	State    llb.State
 	Image    dockerspec.DockerOCIImage
 	Platform ocispecs.Platform
+	Args     map[string]string
 }
 
 // Result is the output of a completed build sequence.
@@ -206,6 +207,7 @@ func (b *Build) currentStage() Stage {
 	return Stage{
 		Name: b.stageName, State: b.State,
 		Image: cloneImage(b.Image), Platform: clonePlatform(b.Platform),
+		Args: maps.Clone(b.stageArgs),
 	}
 }
 
@@ -274,6 +276,7 @@ func cloneStage(src Stage) Stage {
 	return Stage{
 		Name: src.Name, State: src.State,
 		Image: cloneImage(src.Image), Platform: clonePlatform(src.Platform),
+		Args: maps.Clone(src.Args),
 	}
 }
 
