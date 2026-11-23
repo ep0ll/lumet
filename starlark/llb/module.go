@@ -49,6 +49,7 @@ func newModule() *starlarkstruct.Module {
 			ulimitValues(),
 			diffTypeValues(),
 			gitAuthValues(),
+			resolveModeValues(),
 		},
 	} {
 		for _, values := range group {
