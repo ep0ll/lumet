@@ -175,7 +175,11 @@ func Arg(name string, opts ...Option) Instruction {
 		} else {
 			b.globalArgs[name] = value
 		}
-		return b.recordHistory(ctx, "ARG "+name, true)
+		createdBy := "ARG " + name
+		if exists {
+			createdBy += "=" + value
+		}
+		return b.recordHistory(ctx, createdBy, true)
 	}
 }
 
@@ -505,7 +509,9 @@ func OnBuild(trigger string) Instruction {
 			return fmt.Errorf("ONBUILD: %s cannot be used as a trigger", opcode)
 		}
 		b.Image.Config.OnBuild = append(b.Image.Config.OnBuild, trigger)
-		return b.recordHistory(ctx, "ONBUILD "+trigger, true)
+		// ONBUILD stores a trigger for a future consumer build. It does not
+		// create a layer or a history entry in the image being produced here.
+		return nil
 	}
 }
 
