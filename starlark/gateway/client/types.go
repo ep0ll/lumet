@@ -146,16 +146,6 @@ func valueToJSON(value starlark.Value) (any, error) {
 			out[key] = val
 		}
 		return out, nil
-	case starlark.HasAttrs:
-		out := make(map[string]any)
-		for _, name := range v.AttrNames() {
-			item, err := v.Attr(name)
-			if err != nil { return nil, err }
-			val, err := valueToJSON(item)
-			if err != nil { return nil, err }
-			out[name] = val
-		}
-		return out, nil
 	case *starlark.List, starlark.Tuple:
 		iter := starlark.Iterate(value)
 		if iter == nil { return nil, fmt.Errorf("%s is not iterable", value.Type()) }
@@ -168,40 +158,65 @@ func valueToJSON(value starlark.Value) (any, error) {
 			out = append(out, val)
 		}
 		return out, nil
-	case *recordValue:
-		return valueToJSON(starlarkstruct.FromStringDict(starlark.String(v.name), v.fields))
+	case starlark.HasAttrs:
+		out := make(map[string]any)
+		for _, name := range v.AttrNames() {
+			item, err := v.Attr(name)
+			if err != nil { return nil, err }
+			val, err := valueToJSON(item)
+			if err != nil { return nil, err }
+			out[name] = val
+		}
+		return out, nil
 	default:
 		return nil, fmt.Errorf("cannot convert %s to a protobuf field value", valueType(value))
 	}
 }
 
 func protoFromValue(value starlark.Value, message proto.Message, name string) error {
-	if value == nil || value == starlark.None { return nil }
+	if value == nil || value == starlark.None {
+		return nil
+	}
+	if data, ok := value.(starlark.Bytes); ok {
+		if err := proto.Unmarshal([]byte(data), message); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+		return nil
+	}
 	if _, ok := value.(*starlark.Dict); ok {
 		object, err := valueToJSON(value)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		data, err := json.Marshal(object)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if err := (protojson.UnmarshalOptions{}).Unmarshal(data, message); err != nil {
 			return fmt.Errorf("%s: %w", name, err)
 		}
 		return nil
 	}
 	if _, ok := value.(starlark.HasAttrs); ok {
-		object, err := valueToJSON(value)
-		if err != nil { return err }
-		data, err := json.Marshal(object)
-		if err != nil { return err }
-		if err := (protojson.UnmarshalOptions{}).Unmarshal(data, message); err != nil {
-			return fmt.Errorf("%s: %w", name, err)
+		switch value.(type) {
+		case *starlark.List, starlark.Tuple:
+			break
+		default:
+			object, err := valueToJSON(value)
+			if err != nil {
+				return err
+			}
+			data, err := json.Marshal(object)
+			if err != nil {
+				return err
+			}
+			if err := (protojson.UnmarshalOptions{}).Unmarshal(data, message); err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
+			return nil
 		}
-		return nil
 	}
-	if data, ok := value.(starlark.Bytes); ok {
-		if err := proto.Unmarshal([]byte(data), message); err != nil { return fmt.Errorf("%s: %w", name, err) }
-		return nil
-	}
-	return fmt.Errorf("%s: got %s, want dict or protobuf bytes", name, valueType(value))
+	return fmt.Errorf("%s: got %s, want dict, record, or protobuf bytes", name, valueType(value))
 }
 
 func structValue(name string, fields starlark.StringDict) starlark.Value {
