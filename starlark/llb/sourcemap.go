@@ -157,27 +157,44 @@ func sourceMapBuiltins()map[string]starlark.Value{
 	}
 }
 
-func newSourceMapBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	var stateValue,definitionValue starlark.Value=starlark.None,starlark.None
-	var filename,language string
-	var data []byte
-	if err:=starlark.UnpackArgs("NewSourceMap",args,kwargs,
-		"filename",&filename,"language?",&language,"data?",&data,
-		"state?",&stateValue,"definition?",&definitionValue,
-	);err!=nil{return nil,err}
-	sourceMap:=&buildkitllb.SourceMap{Filename:filename,Language:language,Data:data}
-	if stateValue!=starlark.None{
-		state,err:=stateFromValue(stateValue);if err!=nil{return nil,err}
-		sourceMap.State=&state
+func newSourceMapBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var stateValue, definitionValue starlark.Value = starlark.None, starlark.None
+	var filename, language string
+	var dataValue starlark.Value = starlark.Bytes(nil)
+	if err := starlark.UnpackArgs("NewSourceMap", args, kwargs,
+		"filename", &filename,
+		"language?", &language,
+		"data?", &dataValue,
+		"state?", &stateValue,
+		"definition?", &definitionValue,
+	); err != nil {
+		return nil, err
 	}
-	if definitionValue!=starlark.None{
-		definition,ok:=definitionValue.(*DefinitionValue)
-		if !ok||definition==nil{return nil,fmt.Errorf("NewSourceMap.definition: got %s, want llb.Definition",valueType(definitionValue))}
-		sourceMap.Definition=definition.definition
+	data, err := bytesAt("NewSourceMap", starlark.Tuple{dataValue}, 0)
+	if err != nil {
+		return nil, err
 	}
-	if sourceMap.State==nil&&sourceMap.Definition==nil{return nil,fmt.Errorf("NewSourceMap: state or definition is required")}
-	return WrapSourceMap(sourceMap),nil
+	sourceMap := &buildkitllb.SourceMap{Filename: filename, Language: language, Data: data}
+	if stateValue != starlark.None {
+		state, err := stateFromValue(stateValue)
+		if err != nil {
+			return nil, err
+		}
+		sourceMap.State = &state
+	}
+	if definitionValue != starlark.None {
+		definition, ok := definitionValue.(*DefinitionValue)
+		if !ok || definition == nil {
+			return nil, fmt.Errorf("NewSourceMap.definition: got %s, want llb.Definition", valueType(definitionValue))
+		}
+		sourceMap.Definition = definition.definition
+	}
+	if sourceMap.State == nil && sourceMap.Definition == nil {
+		return nil, fmt.Errorf("NewSourceMap: state or definition is required")
+	}
+	return WrapSourceMap(sourceMap), nil
 }
+
 func sourceLocationBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var sourceMapValue starlark.Value
 	var rangeValues starlark.Value=starlark.NewList(nil)
