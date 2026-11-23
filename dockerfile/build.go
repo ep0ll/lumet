@@ -19,11 +19,8 @@ import (
 
 	"github.com/moby/buildkit/client/llb"
 	"github.com/ep0ll/lumet/dockerfile/expand"
-	"github.com/ep0ll/lumet/dockerfile/progress"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
-
-	"github.com/ep0ll/lumet/dockerfile/progress"
 )
 
 // Instruction is a build step. Constructors such as From, Run and Copy return
