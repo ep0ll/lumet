@@ -447,3 +447,26 @@ var (
 	_ starlark.Value    = (*LinuxResourcesValue)(nil)
 	_ starlark.HasAttrs = (*LinuxResourcesValue)(nil)
 )
+
+
+// stateStringMethod adapts a State method that accepts a single string.
+func stateStringMethod(name string, fn func(string) buildkitllb.State) starlark.Value {
+	return boundBuiltin(name, func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		if err := arity(name, args, kwargs, 1, 1); err != nil { return nil, err }
+		value, err := stringAt(name, args, 0)
+		if err != nil { return nil, err }
+		return WrapState(fn(value)), nil
+	})
+}
+
+// stateStringPairMethod adapts a State method that accepts two strings.
+func stateStringPairMethod(name string, fn func(string, string) buildkitllb.State) starlark.Value {
+	return boundBuiltin(name, func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		if err := arity(name, args, kwargs, 2, 2); err != nil { return nil, err }
+		key, err := stringAt(name, args, 0)
+		if err != nil { return nil, err }
+		value, err := stringAt(name, args, 1)
+		if err != nil { return nil, err }
+		return WrapState(fn(key, value)), nil
+	})
+}
