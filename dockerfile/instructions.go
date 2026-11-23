@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/util/system"
@@ -419,10 +420,34 @@ func Healthcheck(command Command, opts ...Option) Instruction {
 			options.HealthRetries < 0 {
 			return fmt.Errorf("HEALTHCHECK: durations and retries cannot be negative")
 		}
+
+		interval := options.HealthInterval
+		if interval == 0 {
+			interval = 30 * time.Second
+		}
+		timeout := options.HealthTimeout
+		if timeout == 0 {
+			timeout = 30 * time.Second
+		}
+		startPeriod := options.HealthStartPeriod
+		startInterval := options.HealthStartInterval
+		if startInterval == 0 {
+			startInterval = 5 * time.Second
+		}
+		retries := options.HealthRetries
+		if retries == 0 {
+			retries = 3
+		}
+		if interval < time.Millisecond || timeout < time.Millisecond ||
+			startInterval < time.Millisecond ||
+			(startPeriod > 0 && startPeriod < time.Millisecond) {
+			return fmt.Errorf("HEALTHCHECK: non-zero durations must be at least 1ms")
+		}
+
 		b.Image.Config.Healthcheck = &dockerspec.HealthcheckConfig{
-			Test: test, Interval: options.HealthInterval,
-			Timeout: options.HealthTimeout, StartPeriod: options.HealthStartPeriod,
-			StartInterval: options.HealthStartInterval, Retries: options.HealthRetries,
+			Test: test, Interval: interval,
+			Timeout: timeout, StartPeriod: startPeriod,
+			StartInterval: startInterval, Retries: retries,
 		}
 		return b.recordHistory(ctx, "HEALTHCHECK "+formatCommand(command), true)
 	}
