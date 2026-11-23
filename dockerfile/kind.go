@@ -1,7 +1,8 @@
 package dockerfile
 
-// Kind identifies a Dockerfile instruction.
-type Kind uint8
+// Kind identifies a built-in Dockerfile instruction. Custom instructions use
+// KindCustom and are distinguished by their registered name.
+type Kind uint16
 
 const (
 	KindFrom Kind = iota
@@ -23,27 +24,70 @@ const (
 	KindStopSignal
 	KindHealthcheck
 	KindOnBuild
+
+	// KindCustom is shared by all user-defined instruction names. The actual
+	// identity is InstructionDefinition.Name, never a new enum constant.
+	KindCustom
 )
 
-var kindNames = [...]string{
-	"FROM", "FROM(reset)", "ARG", "ENV", "LABEL", "MAINTAINER", "RUN", "CMD",
-	"ENTRYPOINT", "SHELL", "EXPOSE", "VOLUME", "USER", "WORKDIR", "COPY", "ADD",
-	"STOPSIGNAL", "HEALTHCHECK", "ONBUILD",
-}
-
 func (k Kind) String() string {
-	if int(k) < len(kindNames) {
-		return kindNames[k]
+	switch k {
+	case KindFrom:
+		return "FROM"
+	case KindArg:
+		return "ARG"
+	case KindEnv:
+		return "ENV"
+	case KindLabel:
+		return "LABEL"
+	case KindMaintainer:
+		return "MAINTAINER"
+	case KindRun:
+		return "RUN"
+	case KindCmd:
+		return "CMD"
+	case KindEntrypoint:
+		return "ENTRYPOINT"
+	case KindShell:
+		return "SHELL"
+	case KindExpose:
+		return "EXPOSE"
+	case KindVolume:
+		return "VOLUME"
+	case KindUser:
+		return "USER"
+	case KindWorkdir:
+		return "WORKDIR"
+	case KindCopy:
+		return "COPY"
+	case KindAdd:
+		return "ADD"
+	case KindStopSignal:
+		return "STOPSIGNAL"
+	case KindHealthcheck:
+		return "HEALTHCHECK"
+	case KindOnBuild:
+		return "ONBUILD"
+	case KindCustom:
+		return "CUSTOM"
+	case KindResetStage:
+		return "FROM(reset)"
+	default:
+		return "UNKNOWN"
 	}
-	return "UNKNOWN"
 }
 
-// HistoryMode tells a handler how an instruction should be recorded in image history.
+// HistoryMode controls the image-history behavior after an instruction handler
+// succeeds.
 type HistoryMode uint8
 
 const (
-	HistoryDefault    HistoryMode = iota // handler decides (per-kind default)
-	HistoryLayer                         // record as a layer-producing entry
-	HistoryEmptyLayer                    // record with EmptyLayer=true (metadata only)
-	HistorySkip                          // do not record
+	// HistoryDefault leaves history management to the instruction handler.
+	HistoryDefault HistoryMode = iota
+	// HistoryLayer appends an entry with EmptyLayer=false.
+	HistoryLayer
+	// HistoryEmptyLayer appends a metadata-only history entry.
+	HistoryEmptyLayer
+	// HistorySkip suppresses automatic history handling.
+	HistorySkip
 )
