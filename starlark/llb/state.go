@@ -3,7 +3,6 @@ package llb
 import (
 	"fmt"
 	"net"
-	"os"
 	"sort"
 
 	buildkitllb "github.com/moby/buildkit/client/llb"
@@ -255,7 +254,68 @@ func constantValues() map[string]starlark.Value {
 		"LinuxArm": &optionValue{kind: "ConstraintsOpt", value: buildkitllb.LinuxArm},
 		"LinuxS390x": &optionValue{kind: "ConstraintsOpt", value: buildkitllb.LinuxS390x},
 		"LinuxPpc64le": &optionValue{kind: "ConstraintsOpt", value: buildkitllb.LinuxPpc64le},
+		"LinuxArmhf": &optionValue{kind: "ConstraintsOpt", value: buildkitllb.LinuxArmhf},
+		"LinuxArmel": &optionValue{kind: "ConstraintsOpt", value: buildkitllb.LinuxArmel},
+		"LinuxPpc64": &optionValue{kind: "ConstraintsOpt", value: buildkitllb.LinuxPpc64},
+		"LinuxRiscv64": &optionValue{kind: "ConstraintsOpt", value: buildkitllb.LinuxRiscv64},
+		"Darwin": &optionValue{kind: "ConstraintsOpt", value: buildkitllb.Darwin},
+		"Windows": &optionValue{kind: "ConstraintsOpt", value: buildkitllb.Windows},
+		"CDIDeviceOptional": &optionValue{kind: "CDIDeviceOption", value: buildkitllb.CDIDeviceOptional},
+		"SSHOptional": &optionValue{kind: "SSHOption", value: buildkitllb.SSHOptional},
+		"SecretOptional": &optionValue{kind: "SecretOption", value: buildkitllb.SecretOptional},
+		"MountContentCacheDefault": starlark.MakeInt(int(buildkitllb.MountContentCacheDefault)),
+		"MountContentCacheOn": starlark.MakeInt(int(buildkitllb.MountContentCacheOn)),
+		"MountContentCacheOff": starlark.MakeInt(int(buildkitllb.MountContentCacheOff)),
+		"UlimitCore": starlark.String(buildkitllb.UlimitCore),
+		"UlimitCPU": starlark.String(buildkitllb.UlimitCPU),
+		"UlimitData": starlark.String(buildkitllb.UlimitData),
+		"UlimitFsize": starlark.String(buildkitllb.UlimitFsize),
+		"UlimitLocks": starlark.String(buildkitllb.UlimitLocks),
+		"UlimitMemlock": starlark.String(buildkitllb.UlimitMemlock),
+		"UlimitMsgqueue": starlark.String(buildkitllb.UlimitMsgqueue),
+		"UlimitNice": starlark.String(buildkitllb.UlimitNice),
+		"UlimitNofile": starlark.String(buildkitllb.UlimitNofile),
+		"UlimitNproc": starlark.String(buildkitllb.UlimitNproc),
+		"UlimitRss": starlark.String(buildkitllb.UlimitRss),
+		"UlimitRtprio": starlark.String(buildkitllb.UlimitRtprio),
+		"UlimitRttime": starlark.String(buildkitllb.UlimitRttime),
+		"UlimitSigpending": starlark.String(buildkitllb.UlimitSigpending),
+		"UlimitStack": starlark.String(buildkitllb.UlimitStack),
 	}
+}
+
+
+type proxyEnvValue struct{ proxy buildkitllb.ProxyEnv }
+
+func (v *proxyEnvValue) String() string        { return "<llb.ProxyEnv>" }
+func (v *proxyEnvValue) Type() string          { return "llb.ProxyEnv" }
+func (v *proxyEnvValue) Freeze()               {}
+func (v *proxyEnvValue) Truth() starlark.Bool  { return true }
+func (v *proxyEnvValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.ProxyEnv") }
+func (v *proxyEnvValue) Attr(name string) (starlark.Value, error) {
+	switch name {
+	case "HTTPProxy", "http_proxy": return starlark.String(v.proxy.HTTPProxy), nil
+	case "HTTPSProxy", "https_proxy": return starlark.String(v.proxy.HTTPSProxy), nil
+	case "FTPProxy", "ftp_proxy": return starlark.String(v.proxy.FTPProxy), nil
+	case "NoProxy", "no_proxy": return starlark.String(v.proxy.NoProxy), nil
+	case "AllProxy", "all_proxy": return starlark.String(v.proxy.AllProxy), nil
+	default: return nil, nil
+	}
+}
+func (v *proxyEnvValue) AttrNames() []string {
+	return []string{"AllProxy", "FTPProxy", "HTTPProxy", "HTTPSProxy", "NoProxy", "all_proxy", "ftp_proxy", "http_proxy", "https_proxy", "no_proxy"}
+}
+
+func proxyEnvBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var proxy buildkitllb.ProxyEnv
+	if err := starlark.UnpackArgs("ProxyEnv", args, kwargs,
+		"http_proxy?", &proxy.HTTPProxy,
+		"https_proxy?", &proxy.HTTPSProxy,
+		"ftp_proxy?", &proxy.FTPProxy,
+		"no_proxy?", &proxy.NoProxy,
+		"all_proxy?", &proxy.AllProxy,
+	); err != nil { return nil, err }
+	return &proxyEnvValue{proxy: proxy}, nil
 }
 
 // Attr exposes Go-style and Python-style names for common State methods.
@@ -531,4 +591,3 @@ func goScalar(value starlark.Value) any {
 
 var _ starlark.HasAttrs = (*StateValue)(nil)
 var _ starlark.HasAttrs = (*ExecStateValue)(nil)
-var _ = os.FileMode(0)
