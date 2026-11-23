@@ -190,6 +190,32 @@ func BuildFunc(filename string, src any, options ExecOptions) gwclient.BuildFunc
 		if !ok {
 			return nil, fmt.Errorf("%s: expected a Starlark build(gateway) function", filename)
 		}
-		return starlarkgatewayclient.BuildCallback(build)(ctx, gatewayClient)
+
+		thread := &starlark.Thread{Name: "lumet gateway build", Print: options.Print}
+		if ctx != nil {
+			thread.SetLocal("context", ctx)
+			stop := context.AfterFunc(ctx, func() {
+				thread.Cancel("context cancelled")
+			})
+			defer stop()
+		}
+		if options.MaxSteps > 0 {
+			thread.SetMaxExecutionSteps(options.MaxSteps)
+		}
+		value, err := starlark.Call(thread, build, starlark.Tuple{
+			starlarkgatewayclient.WrapClient(gatewayClient),
+		}, nil)
+		if err != nil {
+			return nil, err
+		}
+		result, ok := value.(*starlarkgatewayclient.ResultValue)
+		if !ok || result == nil || result.Unwrap() == nil {
+			typeName := "nil"
+			if value != nil {
+				typeName = value.Type()
+			}
+			return nil, fmt.Errorf("%s: build(gateway) returned %s, want gateway.client.result", filename, typeName)
+		}
+		return result.Unwrap(), nil
 	}
 }
