@@ -426,10 +426,14 @@ func TestVariableExpanderCanBeReplaced(t *testing.T) {
 	called := false
 	expander := VariableExpanderFunc(func(input string, lookup expand.Lookup, config expand.Config) (string, error) {
 		called = true
-		if value, ok := lookup("BASE"); !ok || value != "/base" {
-			t.Fatalf("expander received wrong lookup: %q %v", value, ok)
+		if input == "$BASE" {
+			value, ok := lookup("BASE")
+			if !ok || value != "/base" {
+				t.Fatalf("expander received wrong lookup: %q %v", value, ok)
+			}
+			return "custom:" + value, nil
 		}
-		return "custom:" + input, nil
+		return expand.New(config, lookup).Expand(input)
 	})
 	build := New(WithVariableExpander(expander))
 	if err := build.Apply(context.Background(),
@@ -442,7 +446,7 @@ func TestVariableExpanderCanBeReplaced(t *testing.T) {
 	if !called {
 		t.Fatal("custom variable expander was not called")
 	}
-	if got := build.Image.Config.Env[len(build.Image.Config.Env)-1]; got != "VALUE=custom:$BASE" {
+	if got := build.Image.Config.Env[len(build.Image.Config.Env)-1]; got != "VALUE=custom:/base" {
 		t.Fatalf("custom expander result was not used: %q", got)
 	}
 }
