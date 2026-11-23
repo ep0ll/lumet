@@ -153,7 +153,7 @@ type copyInputValue struct{ input buildkitllb.CopyInput }
 func (v *copyInputValue) String() string        { return "<llb.CopyInput>" }
 func (v *copyInputValue) Type() string          { return "llb.CopyInput" }
 func (v *copyInputValue) Freeze()               {}
-func (v *copyInputValue) Truth() starlark.Bool  { return v != nil && v.input != nil }
+func (v *copyInputValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.input != nil) }
 func (v *copyInputValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.CopyInput") }
 
 var _ starlark.HasAttrs = (*FileActionValue)(nil)
