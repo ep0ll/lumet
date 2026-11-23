@@ -267,7 +267,12 @@ func (b *Build) recordHistory(ctx context.Context, createdBy string, emptyLayer 
 		b.Image.Created = &t
 	}
 	if b.HistoryRecorder != nil {
-		return b.HistoryRecorder(ctx, entry)
+		observed := entry
+		if entry.Created != nil {
+			created := *entry.Created
+			observed.Created = &created
+		}
+		return b.HistoryRecorder(ctx, observed)
 	}
 	return nil
 }
@@ -297,6 +302,12 @@ func cloneImage(src dockerspec.DockerOCIImage) dockerspec.DockerOCIImage {
 	dst.OSFeatures = slices.Clone(src.OSFeatures)
 	dst.RootFS.DiffIDs = slices.Clone(src.RootFS.DiffIDs)
 	dst.History = slices.Clone(src.History)
+	for index := range dst.History {
+		if src.History[index].Created != nil {
+			created := *src.History[index].Created
+			dst.History[index].Created = &created
+		}
+	}
 	dst.Config.Env = slices.Clone(src.Config.Env)
 	dst.Config.Entrypoint = slices.Clone(src.Config.Entrypoint)
 	dst.Config.Cmd = slices.Clone(src.Config.Cmd)
