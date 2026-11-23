@@ -22,14 +22,14 @@ func Run(command Command, opts ...Option) Instruction {
 			return fmt.Errorf("RUN: %w", err)
 		}
 
-		runOptions := make([]llb.RunOption, 0, len(options.run)+2)
+		runOptions := make([]llb.RunOption, 0, len(options.RunOptions)+2)
 		runOptions = append(runOptions, llb.Args(args))
-		name := options.customName
+		name := options.CustomName
 		if name == "" {
 			name = "RUN " + formatCommand(command)
 		}
 		runOptions = append(runOptions, llb.WithCustomName(name))
-		runOptions = append(runOptions, options.run...)
+		runOptions = append(runOptions, options.RunOptions...)
 
 		b.State = b.State.Run(runOptions...).Root()
 		return b.recordHistory(ctx, "RUN "+strings.Join(args, " "), false)
