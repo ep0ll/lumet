@@ -30,10 +30,16 @@ func Copy(sources []string, destination string, opts ...Option) Instruction {
 		if err != nil {
 			return fmt.Errorf("COPY: %w", err)
 		}
-		copyOpts := copyOptions(b, options, false)
+		copyOpts, err := copyOptions(b, options, false)
+		if err != nil {
+			return fmt.Errorf("COPY: %w", err)
+		}
 		var action *llb.FileAction
 		for _, source := range sources {
 			source = b.expand(source)
+			if source == "" {
+				return fmt.Errorf("COPY: expanded source path cannot be empty")
+			}
 			sourcePath := rootPath(source)
 			target := destination
 			if options.Parents {
@@ -87,7 +93,10 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 			if options.Unpack != nil {
 				unpack = *options.Unpack
 			}
-			copyOpts := copyOptions(b, options, unpack)
+			copyOpts, err := copyOptions(b, options, unpack)
+			if err != nil {
+				return fmt.Errorf("ADD: %w", err)
+			}
 			if action == nil {
 				action = llb.Copy(state, sourcePath, destination, copyOpts...)
 			} else {
@@ -176,7 +185,7 @@ func resolveAddSource(b *Build, source AddSource, options InstructionOptions) (l
 	}
 }
 
-func copyOptions(b *Build, options InstructionOptions, unpack bool) []llb.CopyOption {
+func copyOptions(b *Build, options InstructionOptions, unpack bool) ([]llb.CopyOption, error) {
 	info := &llb.CopyInfo{
 		CreateDestPath: true,
 		AllowWildcard:  true,
@@ -184,21 +193,31 @@ func copyOptions(b *Build, options InstructionOptions, unpack bool) []llb.CopyOp
 		AttemptUnpack:  unpack,
 	}
 	if options.Chmod != nil {
-		info.Mode = options.Chmod
+		mode := *options.Chmod
+		if mode.ModeStr != "" {
+			mode.ModeStr = b.expand(mode.ModeStr)
+		}
+		info.Mode = &mode
 	}
 	if len(options.Excludes) > 0 {
-		info.ExcludePatterns = append(info.ExcludePatterns, options.Excludes...)
+		for _, pattern := range options.Excludes {
+			info.ExcludePatterns = append(info.ExcludePatterns, b.expand(pattern))
+		}
 	}
 	result := make([]llb.CopyOption, 0, len(options.CopyOptions)+3)
 	result = append(result, info)
 	result = append(result, options.CopyOptions...)
 	if options.Chown != "" {
-		result = append(result, llb.WithUser(b.expand(options.Chown)))
+		chown := b.expand(options.Chown)
+		if chown == "" {
+			return nil, fmt.Errorf("expanded --chown value cannot be empty")
+		}
+		result = append(result, llb.WithUser(chown))
 	}
 	if b.createdAt != nil {
 		result = append(result, llb.WithCreatedTime(*b.createdAt))
 	}
-	return result
+	return result, nil
 }
 
 func combineConstraints(b *Build, options InstructionOptions) []llb.ConstraintsOpt {
