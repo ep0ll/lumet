@@ -1,73 +1,76 @@
 # starlarkllb
 
-Starlark (Python-like) bindings for BuildKit's LLB API.
+Starlark bindings for the full public surface of `github.com/moby/buildkit/client/llb`.
 
-This package is a **thin wrapper** around the real Go package
-`github.com/moby/buildkit/client/llb`. It does not re-implement any of the
-LLB logic; it only makes the most common constructors and methods available
-from Starlark scripts.
+This is a **thin wrapper** layer. All logic lives in the real BuildKit LLB package;
+Starlark only provides a convenient Python-like API.
 
-## Status
+## Layout (mirrors client/llb)
 
-Initial foundation (created by Grok):
+| File            | Corresponds to          | Status                          |
+|-----------------|-------------------------|---------------------------------|
+| `module.go`     | package entrypoint      | done                            |
+| `source.go`     | source.go               | image, scratch, local, git, http |
+| `state.go`      | state.go                | core State methods              |
+| `exec.go`       | exec.go                 | ExecState + mounts              |
+| `fileop.go`     | fileop.go               | FileAction + mkdir/mkfile/rm/copy/symlink |
+| `merge.go`      | merge.go + diff.go      | merge, diff                     |
+| `meta.go`       | meta.go                 | constraints helpers (partial)   |
+| `definition.go` | definition.go           | planned                         |
+| `options.go`    | various option types    | planned                         |
 
-- `llb.image(ref)`
-- `llb.scratch()`
-- `State.dir(path)`
-- `State.add_env(key, value)`
-- `State.user(name)`
-- `State.reset()`
-- `State.run(cmd)` → `ExecState`
-- `ExecState.root()` → `State`
+## Current public surface exposed to Starlark
 
-Many more public APIs from `client/llb` still need to be bound
-(Local, Git, HTTP, File ops, Merge, Diff, platforms, constraints, mounts, etc.).
-The existing code shows the exact pattern to follow.
+```python
+llb.image(ref)
+llb.scratch()
+llb.local(name)
+llb.git(remote, ref="")
+llb.http(url)
 
-## Host usage
+llb.mkdir(path, mode=0o755)
+llb.mkfile(path, data, mode=0o644)
+llb.rm(path)
+llb.copy(input, src, dest)
 
-```go
-package main
+llb.merge(state1, state2, ...)
+llb.diff(lower, upper)
 
-import (
-	"fmt"
-	"os"
+st.dir(path)
+st.add_env(key, value)
+st.del_env(key)
+st.user(name)
+st.hostname(name)
+st.reset()
+st.run(cmd)          # string or list → ExecState
+st.file(action)      # FileAction → State
+st.copy(src_state, dest)
 
-	"github.com/ep0ll/lumet/starlarkllb"
-	"go.starlark.net/starlark"
-)
-
-func main() {
-	predeclared := starlark.StringDict{}
-	starlarkllb.Register(predeclared)
-
-	thread := &starlark.Thread{Name: "main"}
-	globals, err := starlark.ExecFile(thread, "build.star", nil, predeclared)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	st, err := starlarkllb.AsState(globals["result"])
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	// Now you have a real llb.State that you can marshal / solve
-	_ = st
-}
+exec.root()
+exec.add_mount(target, source)
+exec.get_mount(target)
 ```
 
-## Adding new bindings
+## Host integration
 
-1. For a free function (e.g. `llb.local(...)`) add a `*Builtin` in `module.go`
-   and implement it in the appropriate file.
-2. For a method on `State` / `ExecState`:
-   - add the name to `AttrNames()`
-   - add a case in `Attr()` that returns a `NewBuiltin`
-   - implement the method that unpacks Starlark args and calls the real
-     `llb.State` / `llb.ExecState` method.
+```go
+predeclared := starlark.StringDict{}
+starlarkllb.Register(predeclared)
 
-Keep the wrappers thin. Prefer returning new wrapper values rather than
-mutating in place (LLB states are immutable).
+thread := &starlark.Thread{Name: "build"}
+globals, err := starlark.ExecFile(thread, "build.star", nil, predeclared)
+
+st, err := starlarkllb.AsState(globals["result"])
+// st is a real llb.State
+```
+
+## Extending
+
+Follow the existing pattern:
+
+1. Add a new file that mirrors the original LLB file name when practical.
+2. Create thin wrapper types that hold the real LLB value.
+3. Implement `starlark.Value` + `starlark.HasAttrs`.
+4. Register free functions in `module.go`.
+
+The goal is complete coverage of every public identifier in `client/llb`.
