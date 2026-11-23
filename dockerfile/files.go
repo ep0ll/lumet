@@ -74,7 +74,7 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 		}
 		copyOpts := copyOptions(b, options, unpack)
 		for _, source := range sources {
-			state, sourcePath, err := resolveAddSource(source, options)
+			state, sourcePath, err := resolveAddSource(b, source, options)
 			if err != nil {
 				return fmt.Errorf("ADD %q: %w", source.Value, err)
 			}
@@ -107,13 +107,13 @@ func resolveCopySource(b *Build, options instructionOptions) (llb.State, error) 
 	return llb.State{}, fmt.Errorf("source stage or context %q does not exist", options.from)
 }
 
-func resolveAddSource(source AddSource, options instructionOptions) (llb.State, string, error) {
+func resolveAddSource(b *Build, source AddSource, options instructionOptions) (llb.State, string, error) {
 	switch source.Kind {
 	case AddLocal:
 		if source.Value == "" {
 			return llb.State{}, "", fmt.Errorf("local source path cannot be empty")
 		}
-		return llb.State{}, rootPath(source.Value), nil
+		return b.BuildContext, rootPath(b.expand(source.Value)), nil
 	case AddRemote:
 		if source.Value == "" {
 			return llb.State{}, "", fmt.Errorf("remote URL cannot be empty")
