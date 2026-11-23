@@ -17,6 +17,32 @@ type StateValue struct {
 // WrapState adapts a native BuildKit state for use in Starlark globals.
 func WrapState(state buildkitllb.State) *StateValue { return &StateValue{state: state} }
 
+// WrapExecState adapts a native BuildKit execution state for Starlark globals.
+func WrapExecState(state buildkitllb.ExecState) *ExecStateValue {
+	return &ExecStateValue{exec: state}
+}
+
+// WrapFileAction adapts a native BuildKit file action for Starlark globals.
+func WrapFileAction(action *buildkitllb.FileAction) *FileActionValue {
+	return &FileActionValue{action: action}
+}
+
+// WrapDefinition adapts a native BuildKit definition for Starlark globals.
+func WrapDefinition(definition *buildkitllb.Definition) *DefinitionValue {
+	return &DefinitionValue{definition: definition}
+}
+
+// WrapOption adapts a native BuildKit option into an opaque Starlark value.
+// The underlying value must implement the appropriate BuildKit option
+// interface (for example llb.RunOption or llb.ConstraintsOpt). The receiving
+// builtin validates that interface before applying the option.
+func WrapOption(option any) starlark.Value {
+	if option == nil {
+		return starlark.None
+	}
+	return &optionValue{kind: "GoOption", value: option}
+}
+
 // Unwrap returns the immutable BuildKit state represented by v.
 func (v *StateValue) Unwrap() buildkitllb.State {
 	if v == nil {
