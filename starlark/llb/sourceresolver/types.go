@@ -214,13 +214,29 @@ func resolveImageConfigStoreBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args 
 	store:=buildkitsourceresolver.ResolveImageConfigOptStore{SessionID:sessionID,StoreID:storeID}
 	return newRecord("ResolveImageConfigOptStore",store,starlark.StringDict{"session_id":stringField("session_id",sessionID),"store_id":stringField("store_id",storeID)}),nil
 }
-func resolveHTTPChecksumRequestBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+func resolveHTTPChecksumRequestBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var algo int
+	var suffixValue starlark.Value = starlark.None
+	if err := starlark.UnpackArgs("ResolveHTTPChecksumRequest", args, kwargs,
+		"algo?", &algo, "suffix?", &suffixValue,
+	); err != nil {
+		return nil, err
+	}
 	var suffix []byte
-	if err:=starlark.UnpackArgs("ResolveHTTPChecksumRequest",args,kwargs,"algo?",&algo,"suffix?",&suffix);err!=nil{return nil,err}
-	request:=buildkitsourceresolver.ResolveHTTPChecksumRequest{Algo:buildkitsourceresolver.ResolveHTTPChecksumAlgo(algo),Suffix:suffix}
-	return newRecord("ResolveHTTPChecksumRequest",request,starlark.StringDict{"algo":intField(algo),"suffix":bytesField(suffix)}),nil
+	if suffixValue != starlark.None {
+		var err error
+		suffix, err = bytesArg("ResolveHTTPChecksumRequest.suffix", suffixValue)
+		if err != nil { return nil, err }
+	}
+	request := buildkitsourceresolver.ResolveHTTPChecksumRequest{
+		Algo: buildkitsourceresolver.ResolveHTTPChecksumAlgo(algo),
+		Suffix: suffix,
+	}
+	return newRecord("ResolveHTTPChecksumRequest", request, starlark.StringDict{
+		"algo": intField(algo), "suffix": bytesField(suffix),
+	}), nil
 }
+
 func resolverTypeValues()map[string]starlark.Value{
 	return map[string]starlark.Value{
 		"ResolverTypeRegistry":starlark.MakeInt(int(buildkitsourceresolver.ResolverTypeRegistry)),
