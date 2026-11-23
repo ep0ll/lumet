@@ -53,6 +53,12 @@ constructors retain BuildKit's Go names.
 The short form uses the built-in `load("llb", ...)` module:
 
 ```go
+import (
+    "fmt"
+
+    llbstarlark "github.com/ep0ll/lumet/starlark/llb"
+)
+
 globals, err := llbstarlark.Exec(ctx, "build.star", source, nil)
 if err != nil {
     return err
@@ -236,6 +242,8 @@ as `Platform`, `OCIPlatform`, `ProxyEnv`, `Header`, and
 
 Network/security constants: `NetModeSandbox`, `NetModeHost`,
 `NetModeNone`, `SecurityModeInsecure`, `SecurityModeSandbox`.
+Constraint option values: `IgnoreCache`, `MarkImageInternal`, and the
+three `ResolveMode*` values.
 
 Cache constants: `CacheMountShared`, `CacheMountPrivate`, `CacheMountLocked`,
 `MountContentCacheDefault`, `MountContentCacheOn`, `MountContentCacheOff`.
