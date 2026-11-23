@@ -22,11 +22,7 @@ import (
 var Module = newModule()
 
 func newModule() *starlarkstruct.Module {
-	members := starlark.StringDict{
-		"State":     starlark.String("BuildKit LLB state"),
-		"ExecState": starlark.String("BuildKit LLB exec state"),
-		"FileAction": starlark.String("BuildKit LLB file action"),
-	}
+	members := starlark.StringDict{}
 	for name, value := range sourceBuiltins() {
 		members[name] = value
 	}
@@ -57,7 +53,8 @@ func Load(_ *starlark.Thread, module string) (starlark.StringDict, error) {
 
 // NewThread creates a Starlark thread configured to load this package's llb
 // module. The optional context is stored in thread-local storage as "context"
-// and cancels Starlark evaluation when it is done.
+// for context-aware LLB operations. Exec additionally cancels evaluation when
+// its context is cancelled.
 func NewThread(ctx context.Context) *starlark.Thread {
 	thread := &starlark.Thread{Name: "lumet llb", Load: Load}
 	if ctx == nil {
