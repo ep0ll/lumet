@@ -30,6 +30,8 @@ func Run(command Command, opts ...Option) Instruction {
 		}
 		runOptions = append(runOptions, llb.WithCustomName(name))
 		runOptions = append(runOptions, options.RunOptions...)
+		runOptions = append(runOptions, b.constraints...)
+		runOptions = append(runOptions, options.Constraints...)
 
 		b.State = b.State.Run(runOptions...).Root()
 		return b.recordHistory(ctx, "RUN "+strings.Join(args, " "), false)
