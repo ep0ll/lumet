@@ -109,7 +109,9 @@ func resolveCopySource(b *Build, options InstructionOptions) (llb.State, error) 
 	if state, ok := b.namedContexts[options.From]; ok {
 		return state, nil
 	}
-	return llb.State{}, fmt.Errorf("source stage or context %q does not exist", options.From)
+	// Dockerfile COPY --from also accepts an image reference, not only a
+	// previously declared stage or named context.
+	return llb.Image(options.From, options.ImageOptions...).Platform(b.Platform), nil
 }
 
 func resolveAddSource(b *Build, source AddSource, options InstructionOptions) (llb.State, string, error) {
