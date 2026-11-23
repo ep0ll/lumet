@@ -93,9 +93,11 @@ func optionBuiltins() map[string]starlark.Value {
 			store, err := stringAt("ImageBlobOCIStore", a, 1); if err != nil { return nil, err }
 			return buildkitllb.ImageBlobOCIStore(session, store), nil
 		}, 2, 2, "ImageBlobOption"),
-		"HTTPChecksum": stringOption("HTTPChecksum", "HTTPOption", func(s string) buildkitllb.HTTPOption {
-			d, _ := digest.Parse(s); return buildkitllb.Checksum(d)
-		}),
+		"HTTPChecksum": optionBuiltin("HTTPChecksum", func(a starlark.Tuple) (any, error) {
+			raw, err := stringAt("HTTPChecksum", a, 0); if err != nil { return nil, err }
+			d, err := digest.Parse(raw); if err != nil { return nil, fmt.Errorf("HTTPChecksum: %w", err) }
+			return buildkitllb.Checksum(d), nil
+		}, 1, 1, "HTTPOption"),
 		"Filename": stringOption("Filename", "FileInfoOption", buildkitllb.Filename),
 		"Chmod": intOption("Chmod", "FileInfoOption", func(n int) buildkitllb.FileInfoOption { return buildkitllb.Chmod(os.FileMode(n)) }),
 		"Chown": optionBuiltin("Chown", func(a starlark.Tuple) (any, error) {
@@ -198,23 +200,23 @@ func optionBuiltin(name string, build func(starlark.Tuple) (any, error), min, ma
 	})
 }
 
-func stringOption(name, kind string, build func(string) any) starlark.Value {
+func stringOption[T any](name, kind string, build func(string) T) starlark.Value {
 	return optionBuiltin(name, func(a starlark.Tuple) (any, error) { s, err := stringAt(name, a, 0); if err != nil { return nil, err }; return build(s), nil }, 1, 1, kind)
 }
 
-func boolOption(name, kind string, build func(bool) any) starlark.Value {
+func boolOption[T any](name, kind string, build func(bool) T) starlark.Value {
 	return optionBuiltin(name, func(a starlark.Tuple) (any, error) { b, err := boolAt(name, a, 0); if err != nil { return nil, err }; return build(b), nil }, 1, 1, kind)
 }
 
-func intOption(name, kind string, build func(int) any) starlark.Value {
+func intOption[T any](name, kind string, build func(int) T) starlark.Value {
 	return optionBuiltin(name, func(a starlark.Tuple) (any, error) { n, err := intAt(name, a, 0); if err != nil { return nil, err }; return build(n), nil }, 1, 1, kind)
 }
 
-func int64Option(name, kind string, build func(int64) any) starlark.Value {
+func int64Option[T any](name, kind string, build func(int64) T) starlark.Value {
 	return optionBuiltin(name, func(a starlark.Tuple) (any, error) { n, err := int64At(name, a, 0); if err != nil { return nil, err }; return build(n), nil }, 1, 1, kind)
 }
 
-func stringListOption(name, kind string, build func([]string) any) starlark.Value {
+func stringListOption[T any](name, kind string, build func([]string) T) starlark.Value {
 	return optionBuiltin(name, func(a starlark.Tuple) (any, error) { values, err := stringList(a[0]); if err != nil { return nil, err }; return build(values), nil }, 1, 1, kind)
 }
 
