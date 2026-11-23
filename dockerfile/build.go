@@ -4,6 +4,7 @@
 // Each instruction constructor returns an Instruction. Instructions are applied
 // in order to a Build, which carries both the immutable LLB state and mutable
 // image metadata. The package intentionally does not parse Dockerfile text.
+// Build values are mutable and are not safe for concurrent instruction application.
 package dockerfile
 
 import (
@@ -12,6 +13,7 @@ import (
 	"maps"
 	"runtime"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/moby/buildkit/client/llb"
@@ -43,7 +45,7 @@ type Build struct {
 	BuildContext llb.State
 	BuildArgs    map[string]string
 
-	ImageResolver  ImageResolver
+	ImageResolver   ImageResolver
 	HistoryRecorder HistoryRecorder
 
 	namedContexts map[string]llb.State
@@ -74,11 +76,11 @@ type Result struct {
 // New creates a Build with an empty root filesystem and the host platform.
 // Configure the target platform and contexts with BuildOptions as needed.
 func New(opts ...BuildOption) *Build {
-	p := ocispecs.Platform{OS: runtime.GOOS, Architecture: runtime.GOARCH}
+	platform := ocispecs.Platform{OS: runtime.GOOS, Architecture: runtime.GOARCH}
 	b := &Build{
-		Platform:      p,
-		State:         llb.Scratch().Platform(p),
-		Image:         emptyImage(p),
+		Platform:      platform,
+		State:         llb.Scratch().Platform(platform),
+		Image:         emptyImage(platform),
 		BuildContext:  llb.Local("context"),
 		BuildArgs:     make(map[string]string),
 		namedContexts: make(map[string]llb.State),
@@ -93,6 +95,8 @@ func New(opts ...BuildOption) *Build {
 	b.Image.OS = b.Platform.OS
 	b.Image.Architecture = b.Platform.Architecture
 	b.Image.Variant = b.Platform.Variant
+	b.Image.OSVersion = b.Platform.OSVersion
+	b.Image.OSFeatures = slices.Clone(b.Platform.OSFeatures)
 	return b
 }
 
@@ -144,7 +148,8 @@ func WithHistoryRecorder(recorder HistoryRecorder) BuildOption {
 	return func(b *Build) { b.HistoryRecorder = recorder }
 }
 
-// WithConstraints adds constraints to LLB operations created by instructions.
+// WithConstraints adds LLB constraints to file operations created by
+// instructions, including COPY, ADD and WORKDIR.
 func WithConstraints(opts ...llb.ConstraintsOpt) BuildOption {
 	return func(b *Build) { b.constraints = append(b.constraints, opts...) }
 }
@@ -167,12 +172,12 @@ func (b *Build) Apply(ctx context.Context, instructions ...Instruction) error {
 
 // Result returns a detached snapshot of the current state, image and named stages.
 func (b *Build) Result() Result {
-	stages := make(map[string]Stage, len(b.stages))
+	stages := make(map[string]Stage, len(b.stages)+1)
 	for name, stage := range b.stages {
-		stages[name] = Stage{
-			Name: stage.Name, State: stage.State,
-			Image: cloneImage(stage.Image), Platform: clonePlatform(stage.Platform),
-		}
+		stages[name] = cloneStage(stage)
+	}
+	if b.started && b.stageName != "" {
+		stages[b.stageName] = b.currentStage()
 	}
 	return Result{
 		State: b.State, Image: cloneImage(b.Image),
@@ -180,25 +185,43 @@ func (b *Build) Result() Result {
 	}
 }
 
-// Stage returns a previously completed named stage.
+// Stage returns a previously completed stage, or the current stage when its
+// name matches the requested name.
 func (b *Build) Stage(name string) (Stage, bool) {
-	stage, ok := b.stages[name]
+	if b.started && strings.EqualFold(name, b.stageName) && b.stageName != "" {
+		return cloneStage(b.currentStage()), true
+	}
+	stage, ok := b.lookupStage(name)
 	if !ok {
 		return Stage{}, false
 	}
-	stage.Image = cloneImage(stage.Image)
-	stage.Platform = clonePlatform(stage.Platform)
-	return stage, true
+	return cloneStage(stage), true
+}
+
+func (b *Build) currentStage() Stage {
+	return Stage{
+		Name: b.stageName, State: b.State,
+		Image: cloneImage(b.Image), Platform: clonePlatform(b.Platform),
+	}
 }
 
 func (b *Build) saveStage() {
 	if !b.started || b.stageName == "" {
 		return
 	}
-	b.stages[b.stageName] = Stage{
-		Name: b.stageName, State: b.State,
-		Image: cloneImage(b.Image), Platform: clonePlatform(b.Platform),
+	b.stages[b.stageName] = b.currentStage()
+}
+
+func (b *Build) lookupStage(name string) (Stage, bool) {
+	if stage, ok := b.stages[name]; ok {
+		return stage, true
 	}
+	for stageName, stage := range b.stages {
+		if strings.EqualFold(stageName, name) {
+			return stage, true
+		}
+	}
+	return Stage{}, false
 }
 
 func (b *Build) requireStage(instruction string) error {
@@ -239,13 +262,20 @@ func (b *Build) recordHistory(ctx context.Context, createdBy string, emptyLayer 
 	return nil
 }
 
+func cloneStage(src Stage) Stage {
+	return Stage{
+		Name: src.Name, State: src.State,
+		Image: cloneImage(src.Image), Platform: clonePlatform(src.Platform),
+	}
+}
+
 func emptyImage(platform ocispecs.Platform) dockerspec.DockerOCIImage {
 	image := dockerspec.DockerOCIImage{}
 	image.OS = platform.OS
 	image.Architecture = platform.Architecture
-	image.Variant = platform.Variant
 	image.OSVersion = platform.OSVersion
 	image.OSFeatures = slices.Clone(platform.OSFeatures)
+	image.Variant = platform.Variant
 	image.RootFS.Type = "layers"
 	image.Config.WorkingDir = "/"
 	return image
