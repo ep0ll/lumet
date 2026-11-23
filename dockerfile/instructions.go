@@ -129,7 +129,8 @@ func From(reference string, opts ...Option) Instruction {
 		b.State = state
 		b.Image = image
 		b.Platform = platform
-		b.stageArgs = make(map[string]string)
+		b.stageArgs = inheritedArgs
+		b.stageEnv = inheritedEnv
 		b.stageName = options.StageName
 		b.started = true
 		return nil
