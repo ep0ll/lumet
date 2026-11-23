@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
@@ -51,16 +52,67 @@ func Load(_ *starlark.Thread, module string) (starlark.StringDict, error) {
 	}
 }
 
-// NewThread creates a Starlark thread configured to load this package's llb
+// ModuleLoader resolves a non-built-in Starlark module name to its globals.
+// The callback should evaluate the requested module using the supplied thread.
+// NewThreadWithLoader caches successful results and detects cyclic loads.
+type ModuleLoader func(thread *starlark.Thread, module string) (starlark.StringDict, error)
+
+// NewThread creates a Starlark thread configured to load the built-in llb
 // module. The optional context is stored in thread-local storage as "context"
 // for context-aware LLB operations. Exec additionally cancels evaluation when
 // its context is cancelled.
 func NewThread(ctx context.Context) *starlark.Thread {
-	thread := &starlark.Thread{Name: "lumet llb", Load: Load}
-	if ctx == nil {
-		return thread
+	return NewThreadWithLoader(ctx, nil)
+}
+
+// NewThreadWithLoader creates a Starlark thread with the built-in LLB module
+// and an optional application module loader. Loaded module globals are frozen
+// and cached for the lifetime of the thread.
+func NewThreadWithLoader(ctx context.Context, loader ModuleLoader) *starlark.Thread {
+	thread := &starlark.Thread{Name: "lumet llb"}
+	if ctx != nil {
+		thread.SetLocal("context", ctx)
 	}
-	thread.SetLocal("context", ctx)
+	var mu sync.Mutex
+	cache := map[string]starlark.StringDict{
+		"llb": Module.Members,
+		"lumet.llb": Module.Members,
+		"llb.star": Module.Members,
+		"lumet.llb.star": Module.Members,
+	}
+	loading := make(map[string]bool)
+	thread.Load = func(thread *starlark.Thread, module string) (starlark.StringDict, error) {
+		mu.Lock()
+		if globals, ok := cache[module]; ok {
+			mu.Unlock()
+			return globals, nil
+		}
+		if loading[module] {
+			mu.Unlock()
+			return nil, fmt.Errorf("starlark: cyclic load of module %q", module)
+		}
+		if loader == nil {
+			mu.Unlock()
+			return nil, fmt.Errorf("llb: unknown Starlark module %q", module)
+		}
+		loading[module] = true
+		mu.Unlock()
+
+		globals, err := loader(thread, module)
+
+		mu.Lock()
+		delete(loading, module)
+		if err == nil {
+			if globals == nil {
+				err = fmt.Errorf("starlark: module loader returned nil globals for %q", module)
+			} else {
+				globals.Freeze()
+				cache[module] = globals
+			}
+		}
+		mu.Unlock()
+		return globals, err
+	}
 	return thread
 }
 
@@ -76,6 +128,10 @@ type ExecOptions struct {
 
 	// Print receives messages emitted by the Starlark print() builtin.
 	Print func(thread *starlark.Thread, message string)
+
+	// Loader resolves application modules in addition to the built-in llb module.
+	// The caller owns path validation and source-file access.
+	Loader ModuleLoader
 }
 
 // Exec evaluates src as a Starlark file with the LLB module loader installed.
@@ -90,7 +146,7 @@ func ExecWithOptions(ctx context.Context, filename string, src any, predeclared 
 	if predeclared == nil {
 		predeclared = starlark.StringDict{}
 	}
-	thread := NewThread(ctx)
+	thread := NewThreadWithLoader(ctx, options.Loader)
 	thread.Print = options.Print
 	if options.MaxSteps > 0 {
 		thread.SetMaxExecutionSteps(options.MaxSteps)
