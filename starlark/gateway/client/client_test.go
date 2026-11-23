@@ -17,6 +17,7 @@ import (
 
 type fakeGateway struct {
 	lastSolve gwclient.SolveRequest
+	resolveOptions buildkitsourceresolver.Opt
 	solveCalls int
 }
 
@@ -28,8 +29,9 @@ func (f *fakeGateway) Solve(_ context.Context, req gwclient.SolveRequest) (*gwcl
 	f.solveCalls++
 	return gwclient.NewResult(), nil
 }
-func (f *fakeGateway) ResolveImageConfig(_ context.Context, _ string, _ buildkitsourceresolver.Opt) (string, digest.Digest, []byte, error) {
-	return "", "", nil, nil
+func (f *fakeGateway) ResolveImageConfig(_ context.Context, _ string, opt buildkitsourceresolver.Opt) (string, digest.Digest, []byte, error) {
+	f.resolveOptions = opt
+	return "docker.io/library/alpine:latest", digest.Digest("sha256:abcdef"), []byte("config"), nil
 }
 func (f *fakeGateway) BuildOpts() gwclient.BuildOpts { return gwclient.BuildOpts{} }
 func (f *fakeGateway) Inputs(context.Context) (map[string]buildkitllb.State, error) {
@@ -146,5 +148,8 @@ source := strings.Join([]string{
 	}
 	if gateway.solveCalls != 1 || !gateway.lastSolve.Evaluate {
 		t.Fatalf("gateway Solve calls=%d, request=%+v", gateway.solveCalls, gateway.lastSolve)
+	}
+	if gateway.resolveOptions.ImageOpt == nil || gateway.resolveOptions.ImageOpt.ResolveMode != "pull" {
+		t.Fatalf("ResolveImageConfig received options %+v; want resolve mode pull", gateway.resolveOptions)
 	}
 }
