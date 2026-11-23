@@ -114,62 +114,6 @@ func newDefinitionOpBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark
 	return WrapDefinitionOp(op),nil
 }
 
-func (v *VertexValue) Attr(name string)(starlark.Value,error){
-	if v==nil||v.vertex==nil{return nil,fmt.Errorf("llb.Vertex: nil receiver")}
-	switch name{
-	case "Output","output":
-		return boundBuiltin("Vertex.Output",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("Vertex.Output",args,kwargs,0,0);err!=nil{return nil,err}
-			output:=v.vertex.Output()
-			if output==nil{return starlark.None,nil}
-			return WrapOutput(output),nil
-		}),nil
-	case "Inputs","inputs":
-		return boundBuiltin("Vertex.Inputs",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("Vertex.Inputs",args,kwargs,0,0);err!=nil{return nil,err}
-			return outputListValue(v.vertex.Inputs()),nil
-		}),nil
-	case "Validate","validate":
-		return boundBuiltin("Vertex.Validate",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("Vertex.Validate",args,kwargs,0,-1);err!=nil{return nil,err}
-			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
-			if err:=v.vertex.Validate(callContext(thread),constraints);err!=nil{return nil,err}
-			return starlark.None,nil
-		}),nil
-	case "Marshal","marshal":
-		return boundBuiltin("Vertex.Marshal",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("Vertex.Marshal",args,kwargs,0,-1);err!=nil{return nil,err}
-			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
-			dgst,data,metadata,sources,err:=v.vertex.Marshal(callContext(thread),constraints)
-			if err!=nil{return nil,err}
-			return marshalResult(dgst,data,metadata,sources),nil
-		}),nil
-	default:return nil,nil
-	}
-}
-func (v *VertexValue) AttrNames()[]string{return []string{"Output","Inputs","Validate","Marshal","output","inputs","validate","marshal"}}
-
-func (v *OutputValue) Attr(name string)(starlark.Value,error){
-	if v==nil||v.output==nil{return nil,fmt.Errorf("llb.Output: nil receiver")}
-	switch name{
-	case "Vertex","vertex":
-		return boundBuiltin("Output.Vertex",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("Output.Vertex",args,kwargs,0,-1);err!=nil{return nil,err}
-			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
-			return WrapVertex(v.output.Vertex(callContext(thread),constraints)),nil
-		}),nil
-	case "ToInput","to_input":
-		return boundBuiltin("Output.ToInput",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("Output.ToInput",args,kwargs,0,-1);err!=nil{return nil,err}
-			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
-			input,err:=v.output.ToInput(callContext(thread),constraints);if err!=nil{return nil,err}
-			if input==nil{return starlark.None,nil}
-			return starlarkstructValue("llb.Input",starlark.StringDict{"digest":starlark.String(input.Digest),"index":starlark.MakeInt64(input.Index)}),nil
-		}),nil
-	default:return nil,nil
-	}
-}
-func (v *OutputValue) AttrNames()[]string{return []string{"Vertex","ToInput","vertex","to_input"}}
 
 var (
 	_ starlark.Value=(*DefinitionOpValue)(nil)
