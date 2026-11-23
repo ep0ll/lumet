@@ -9,6 +9,7 @@ import (
 	buildkitllb "github.com/moby/buildkit/client/llb"
 	"github.com/opencontainers/go-digest"
 	"github.com/moby/buildkit/solver/pb"
+	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.starlark.net/starlark"
 )
 
@@ -23,6 +24,17 @@ func optionBuiltins() map[string]starlark.Value {
 		"WithoutExportCache": optionBuiltin("WithoutExportCache", func(a starlark.Tuple) (any, error) { return buildkitllb.WithoutExportCache(), nil }, 0, 0, "ConstraintsOpt"),
 		"WithoutDefaultExportCache": optionBuiltin("WithoutDefaultExportCache", func(a starlark.Tuple) (any, error) { return buildkitllb.WithoutDefaultExportCache(), nil }, 0, 0, "ConstraintsOpt"),
 		"WithDescription": optionBuiltin("WithDescription", withDescription, 1, 1, "ConstraintsOpt"),
+		"Platform": builtin("Platform", platformConstraintBuiltin),
+		"CPUPeriod": uint64Option("CPUPeriod", "ConstraintsOpt", buildkitllb.CPUPeriod),
+		"CPUQuota": int64Option("CPUQuota", "ConstraintsOpt", buildkitllb.CPUQuota),
+		"CPUShares": uint64Option("CPUShares", "ConstraintsOpt", buildkitllb.CPUShares),
+		"CpusetCpus": stringOption("CpusetCpus", "ConstraintsOpt", buildkitllb.CpusetCpus),
+		"CpusetMems": stringOption("CpusetMems", "ConstraintsOpt", buildkitllb.CpusetMems),
+		"LocalUniqueID": stringOption("LocalUniqueID", "ConstraintsOpt", buildkitllb.LocalUniqueID),
+		"MemoryLimit": int64Option("MemoryLimit", "ConstraintsOpt", buildkitllb.MemoryLimit),
+		"MemorySwapLimit": int64Option("MemorySwapLimit", "ConstraintsOpt", buildkitllb.MemorySwapLimit),
+		"ProgressGroup": optionBuiltin("ProgressGroup", progressGroupOption, 3, 3, "ConstraintsOpt"),
+		"Require": optionBuiltin("Require", requireOption, 0, -1, "ConstraintsOpt"),
 		"Network": optionBuiltin("Network", func(a starlark.Tuple) (any, error) {
 			n, err := intAt("Network", a, 0); if err != nil { return nil, err }
 			return buildkitllb.Network(pb.NetMode(n)), nil
@@ -237,6 +249,14 @@ func intOption[T any](name, kind string, build func(int) T) starlark.Value {
 	return optionBuiltin(name, func(a starlark.Tuple) (any, error) { n, err := intAt(name, a, 0); if err != nil { return nil, err }; return build(n), nil }, 1, 1, kind)
 }
 
+func uint64Option[T any](name, kind string, build func(uint64) T) starlark.Value {
+	return optionBuiltin(name, func(a starlark.Tuple) (any, error) {
+		n, err := uint64At(name, a, 0)
+		if err != nil { return nil, err }
+		return build(n), nil
+	}, 1, 1, kind)
+}
+
 func int64Option[T any](name, kind string, build func(int64) T) starlark.Value {
 	return optionBuiltin(name, func(a starlark.Tuple) (any, error) { n, err := int64At(name, a, 0); if err != nil { return nil, err }; return build(n), nil }, 1, 1, kind)
 }
@@ -350,4 +370,59 @@ func ociChecksumOption(a starlark.Tuple) (any, error) {
 	d, err := digest.Parse(raw)
 	if err != nil { return nil, fmt.Errorf("OCIChecksum: %w", err) }
 	return buildkitllb.OCIChecksum(d), nil
+}
+
+
+func uint64At(name string, args starlark.Tuple, index int) (uint64, error) {
+	value, ok := args[index].(starlark.Int)
+	if !ok { return 0, fmt.Errorf("%s: argument %d: got %s, want int", name, index+1, valueType(args[index])) }
+	result, ok := value.Uint64()
+	if !ok { return 0, fmt.Errorf("%s: argument %d: expected a non-negative uint64", name, index+1) }
+	return result, nil
+}
+
+func platformConstraintBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var osName, architecture, variant, osVersion string
+	if err := starlark.UnpackArgs("Platform", args, kwargs,
+		"os", &osName,
+		"architecture", &architecture,
+		"variant?", &variant,
+		"os_version?", &osVersion,
+	); err != nil { return nil, err }
+	return &optionValue{kind: "ConstraintsOpt", value: buildkitllb.Platform(ocispecs.Platform{
+		OS: osName, Architecture: architecture, Variant: variant, OSVersion: osVersion,
+	})}, nil
+}
+
+func progressGroupOption(args starlark.Tuple) (any, error) {
+	id, err := stringAt("ProgressGroup", args, 0)
+	if err != nil { return nil, err }
+	name, err := stringAt("ProgressGroup", args, 1)
+	if err != nil { return nil, err }
+	weak, err := boolAt("ProgressGroup", args, 2)
+	if err != nil { return nil, err }
+	return buildkitllb.ProgressGroup(id, name, weak), nil
+}
+
+func requireOption(args starlark.Tuple) (any, error) {
+	var filters []string
+	if len(args) == 1 {
+		if list, ok := args[0].(starlark.Indexable); ok {
+			var err error
+			filters, err = stringList(list)
+			if err != nil { return nil, err }
+		} else {
+			value, ok := args[0].(starlark.String)
+			if !ok { return nil, fmt.Errorf("Require: got %s, want string or list of strings", valueType(args[0])) }
+			filters = []string{string(value)}
+		}
+	} else {
+		filters = make([]string, len(args))
+		for i := range args {
+			value, ok := args[i].(starlark.String)
+			if !ok { return nil, fmt.Errorf("Require: argument %d: got %s, want string", i+1, valueType(args[i])) }
+			filters[i] = string(value)
+		}
+	}
+	return buildkitllb.Require(filters...), nil
 }
