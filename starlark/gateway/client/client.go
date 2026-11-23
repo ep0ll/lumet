@@ -19,6 +19,37 @@ import (
 	"go.starlark.net/starlarkstruct"
 )
 
+// Aliases retain BuildKit's native gateway API types for Go callers while
+// the Starlark globals below expose the corresponding snake_case values.
+type (
+	Client = gwclient.Client
+	Result = gwclient.Result
+	Attestation = gwclient.Attestation
+	BuildFunc = gwclient.BuildFunc
+	NewContainerRequest = gwclient.NewContainerRequest
+	Mount = gwclient.Mount
+	Container = gwclient.Container
+	StartRequest = gwclient.StartRequest
+	WinSize = gwclient.WinSize
+	ContainerProcess = gwclient.ContainerProcess
+	Reference = gwclient.Reference
+	ReadRequest = gwclient.ReadRequest
+	ReadContainerRequest = gwclient.ReadContainerRequest
+	FileRange = gwclient.FileRange
+	ReadDirRequest = gwclient.ReadDirRequest
+	ReadDirContainerRequest = gwclient.ReadDirContainerRequest
+	StatRequest = gwclient.StatRequest
+	StatContainerRequest = gwclient.StatContainerRequest
+	SolveRequest = gwclient.SolveRequest
+	CacheOptionsEntry = gwclient.CacheOptionsEntry
+	WorkerInfo = gwclient.WorkerInfo
+	BuildOpts = gwclient.BuildOpts
+	WarnOpts = gwclient.WarnOpts
+	MetaResolver = buildkitsourceresolver.MetaResolver
+	ResolverOpt = buildkitsourceresolver.Opt
+	MetaResponse = buildkitsourceresolver.MetaResponse
+)
+
 type ClientValue struct { client gwclient.Client }
 
 func WrapClient(client gwclient.Client) *ClientValue { return &ClientValue{client: client} }
@@ -132,6 +163,7 @@ func Members(client gwclient.Client) starlark.StringDict {
 		"new_result": builtin("new_result", newResultBuiltin),
 		"attestation": builtin("attestation", attestationBuiltin),
 		"attestation_from_pb": builtin("attestation_from_pb", attestationFromPBBuiltin),
+		"attestation_to_pb": builtin("attestation_to_pb", attestationToPBBuiltin),
 		"solve_request": builtin("solve_request", solveRequestBuiltin),
 		"cache_options_entry": builtin("cache_options_entry", cacheOptionsEntryBuiltin),
 		"mount": builtin("mount", mountBuiltin),
@@ -272,10 +304,10 @@ func builtin(name string, fn func(*starlark.Thread, *starlark.Builtin, starlark.
 	return starlark.NewBuiltin(name, fn)
 }
 
-// BuildFunc adapts a Starlark callable to BuildKit's gateway BuildFunc. The
+// BuildCallback adapts a Starlark callable to BuildKit's gateway BuildFunc. The
 // callable receives the invocation-scoped ClientValue and must return a
 // gateway.client.result created by client.solve() or new_result().
-func BuildFunc(build starlark.Callable) gwclient.BuildFunc {
+func BuildCallback(build starlark.Callable) gwclient.BuildFunc {
 	return func(ctx context.Context, client gwclient.Client) (*gwclient.Result, error) {
 		thread := &starlark.Thread{Name: "lumet gateway build"}
 		if ctx != nil {
