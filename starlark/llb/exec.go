@@ -64,9 +64,7 @@ func (v *ExecStateValue) Attr(name string) (starlark.Value, error) {
 
 func (v *ExecStateValue) AttrNames() []string {
 	names := []string{"AddMount", "GetMount", "Root", "add_mount", "get_mount", "root"}
-	for _, group := range stateAttrNames {
-		names = append(names, group...)
-	}
+	names = append(names, WrapState(v.execState.State).AttrNames()...)
 	return compactStrings(names)
 }
 
