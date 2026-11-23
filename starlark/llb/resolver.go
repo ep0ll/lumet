@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	spb "github.com/moby/buildkit/sourcepolicy/pb"
 	buildkitllb "github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/client/llb/sourceresolver"
 	digest "github.com/opencontainers/go-digest"
