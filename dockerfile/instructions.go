@@ -5,15 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/util/system"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
-	digest "github.com/opencontainers/go-digest"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -46,8 +45,8 @@ func Sh(command string) ShellForm { return ShellForm(command) }
 // Exec creates an exec-form command.
 func Exec(args ...string) ExecForm { return ExecForm(args) }
 
-// From starts a build stage from an image, scratch, a previous stage or a
-// registered named context. The returned function applies the stage to Build.
+// From starts a build stage from an image, scratch, a previous stage, a named
+// context or an explicit LLB state. The returned function applies the stage.
 func From(reference string, opts ...Option) Instruction {
 	options := collectOptions(opts)
 	return func(ctx context.Context, b *Build) error {
@@ -67,32 +66,35 @@ func From(reference string, opts ...Option) Instruction {
 			image = emptyImage(platform)
 		)
 		switch {
+		case options.baseState != nil:
+			state = *options.baseState
 		case strings.EqualFold(ref, "scratch"):
 			state = llb.Scratch()
-		case func() bool { _, ok := b.stages[ref]; return ok }():
-			stage := b.stages[ref]
-			state = stage.State
-			image = cloneImage(stage.Image)
-			if options.platform == nil {
-				platform = clonePlatform(stage.Platform)
-			}
-		case func() bool { _, ok := b.namedContexts[ref]; return ok }():
-			state = b.namedContexts[ref]
 		default:
-			state = llb.Image(ref, options.image...)
-			if b.ImageResolver != nil {
-				resolved, err := b.ImageResolver(ctx, ref, platform)
-				if err != nil {
-					return fmt.Errorf("resolve base image %q: %w", ref, err)
+			if stage, ok := b.stages[ref]; ok {
+				state = stage.State
+				image = cloneImage(stage.Image)
+				if options.platform == nil {
+					platform = clonePlatform(stage.Platform)
 				}
-				image = cloneImage(resolved)
-				config, err := json.Marshal(resolved)
-				if err != nil {
-					return fmt.Errorf("encode base image config %q: %w", ref, err)
-				}
-				state, err = state.WithImageConfig(config)
-				if err != nil {
-					return fmt.Errorf("apply base image config %q: %w", ref, err)
+			} else if named, ok := b.namedContexts[ref]; ok {
+				state = named
+			} else {
+				state = llb.Image(ref, options.image...)
+				if b.ImageResolver != nil {
+					resolved, err := b.ImageResolver(ctx, ref, platform)
+					if err != nil {
+						return fmt.Errorf("resolve base image %q: %w", ref, err)
+					}
+					image = cloneImage(resolved)
+					config, err := json.Marshal(resolved)
+					if err != nil {
+						return fmt.Errorf("encode base image config %q: %w", ref, err)
+					}
+					state, err = state.WithImageConfig(config)
+					if err != nil {
+						return fmt.Errorf("apply base image config %q: %w", ref, err)
+					}
 				}
 			}
 		}
@@ -240,7 +242,7 @@ func Expose(ports ...string) Instruction {
 			b.Image.Config.ExposedPorts = make(map[string]struct{})
 		}
 		for _, value := range ports {
-			expanded, err := expandPorts(value)
+			expanded, err := expandPorts(b.expand(value))
 			if err != nil {
 				return fmt.Errorf("EXPOSE: %w", err)
 			}
@@ -265,10 +267,11 @@ func Volume(paths ...string) Instruction {
 			if value == "" {
 				return fmt.Errorf("VOLUME: path cannot be empty")
 			}
+			value = b.expand(value)
 			if !strings.HasPrefix(value, "/") {
-				value = strings.TrimSuffix(b.Image.Config.WorkingDir, "/") + "/" + value
+				value = path.Join(b.Image.Config.WorkingDir, value)
 			}
-			b.Image.Config.Volumes[pathClean(value)] = struct{}{}
+			b.Image.Config.Volumes[path.Clean(value)] = struct{}{}
 		}
 		return b.recordHistory(ctx, "VOLUME "+strings.Join(paths, " "), true)
 	}
@@ -507,15 +510,6 @@ func expandPorts(value string) ([]string, error) {
 	return result, nil
 }
 
-func pathClean(value string) string {
-	if value == "" {
-		return "/"
-	}
-	return strings.TrimSuffix(strings.ReplaceAll(value, "//", "/"), "/")
-}
-
-// keep syscall imported as the standard-library signal representation.
+// keep the standard library signal contract explicit at compile time.
 var _ os.Signal = syscall.Signal(0)
-var _ = time.Second
-var _ = digest.Digest("")
 var _ ocispecs.Platform
