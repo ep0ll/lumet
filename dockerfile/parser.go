@@ -6,8 +6,8 @@ import (
 )
 
 // ParseTokens parses already-tokenized Dockerfile instruction operands. It
-// handles the instruction flag layer, not shell quoting, continuations,
-// heredocs, JSON arrays, or environment expansion.
+// handles instruction flags, not shell quoting, continuations, heredocs, JSON
+// arrays, or environment expansion.
 //
 // Supported forms are --name=value, --name value, -a value, boolean --name,
 // boolean --no-name, repeatable flags, and the -- end-of-flags marker. Parsing
@@ -16,6 +16,7 @@ func (i *Instruction) ParseTokens(tokens ...string) ([]string, error) {
 	if i == nil {
 		return nil, fmt.Errorf("%w: nil instruction", ErrInvalidInstruction)
 	}
+
 	snapshot := i.Clone()
 	baseVersion := snapshot.version
 	arguments, err := snapshot.parseTokens(tokens...)
@@ -37,6 +38,16 @@ func (i *Instruction) ParseTokens(tokens ...string) ([]string, error) {
 }
 
 func (i *Instruction) parseTokens(tokens ...string) ([]string, error) {
+	// An instruction with no declared flags treats every token as a positional
+	// argument. This is important for CMD/ENTRYPOINT and custom instructions
+	// whose arguments naturally begin with '-' or '--'.
+	if len(i.definition.Flags) == 0 {
+		if err := i.SetArguments(tokens...); err != nil {
+			return nil, err
+		}
+		return i.Arguments(), nil
+	}
+
 	arguments := make([]string, 0, len(tokens))
 	parsingFlags := true
 	for index := 0; index < len(tokens); index++ {
@@ -54,19 +65,35 @@ func (i *Instruction) parseTokens(tokens ...string) ([]string, error) {
 			parsingFlags = false
 			continue
 		}
+		if strings.HasPrefix(token, "---") {
+			return nil, fmt.Errorf("%w: invalid flag token %q", ErrInvalidInstruction, token)
+		}
 
-		nameValue := strings.TrimLeft(token, "-")
+		longFlag := strings.HasPrefix(token, "--")
+		nameValue := strings.TrimPrefix(token, "-")
+		if longFlag {
+			nameValue = strings.TrimPrefix(token, "--")
+		}
 		if nameValue == "" {
 			return nil, fmt.Errorf("%w: invalid flag token %q", ErrInvalidInstruction, token)
 		}
+
 		name, raw, hasValue := strings.Cut(nameValue, "=")
 		lookup := name
 		definition, exists := i.flagDefinition(name)
 		negated := false
-		if !exists && strings.HasPrefix(name, "no-") {
+		if !exists && longFlag && strings.HasPrefix(name, "no-") {
 			lookup = strings.TrimPrefix(name, "no-")
 			definition, exists = i.flagDefinition(lookup)
 			negated = exists
+		}
+		if !exists && !longFlag {
+			// Short options are ambiguous with command arguments. Treat an
+			// unregistered -x token as the beginning of the command; registered
+			// one-character aliases continue to work as flags.
+			arguments = append(arguments, token)
+			parsingFlags = false
+			continue
 		}
 		if !exists {
 			return nil, fmt.Errorf("%w: unknown flag %q for %s", ErrInvalidInstruction, token, i.Name())
@@ -103,6 +130,7 @@ func (i *Instruction) parseTokens(tokens ...string) ([]string, error) {
 			return nil, err
 		}
 	}
+
 	if err := i.SetArguments(arguments...); err != nil {
 		return nil, err
 	}
@@ -113,6 +141,7 @@ func (i *Instruction) flagDefinition(name string) (FlagDefinition, bool) {
 	if i == nil {
 		return FlagDefinition{}, false
 	}
+
 	i.mu.RLock()
 	index := findFlagIndex(i.definition.Flags, name)
 	if index < 0 {
@@ -121,5 +150,6 @@ func (i *Instruction) flagDefinition(name string) (FlagDefinition, bool) {
 	}
 	definition := i.definition.Flags[index]
 	i.mu.RUnlock()
+
 	return cloneFlagDefinition(definition), true
 }

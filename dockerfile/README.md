@@ -241,6 +241,15 @@ A future flag does not need a new option interface or a constructor signature
 change. It can be supplied generically with `WithFlag`, or a convenience
 function can be added as an additive wrapper around it.
 
+For instructions whose primary value is structured rather than positional,
+use the typed payload helpers:
+
+```go
+dockerfile.WithCommand(dockerfile.Exec("echo", "hello"))
+dockerfile.WithSource(dockerfile.Image("alpine:3.21"))
+```
+
+
 Extensions are namespaced application-owned values. They are intended for
 metadata and behavior that should not be promoted into a shared flag schema.
 
@@ -264,15 +273,24 @@ run, err := registry.NewWithOptions(
 The option bundle exposes native `llb.ImageOption`, `llb.RunOption`,
 `llb.CopyOption`, and `llb.ConstraintsOpt` collections. Network and
 security are represented separately because BuildKit models them on
-`llb.State`, not on `llb.RunOption`:
+`llb.State`, not on `llb.RunOption`. Constraints are applied as state marshal
+defaults, while RUN options are supplied to `State.Run`:
 
 ```go
-buildOptions := instruction.BuildKitOptions()
-state := buildOptions.ApplyToState(stage.State)
-runOptions := append([]llb.RunOption{llb.Args([]string{"go", "test"})}, buildOptions.RunOptions()...)
-execState := state.Run(runOptions...)
+func lowerRun(call dockerfile.Call, commandArgs []string) llb.State {
+    buildOptions := call.LLB
+    state := buildOptions.ApplyToState(call.Stage.State)
+    state = state.SetMarshalDefaults(buildOptions.Constraints()...)
+    runOptions := append(
+        []llb.RunOption{llb.Args(commandArgs)},
+        buildOptions.RunOptions()...,
+    )
+    return state.Run(runOptions...).Root()
+}
 ```
 
+For a FROM handler, pass `ImageOptions()` to `llb.Image`. For COPY and ADD
+handlers, pass `CopyOptions()` to `llb.Copy` or the appropriate file action.
 Handlers are responsible for mapping validated Dockerfile flags to the
 appropriate LLB operation and for updating OCI image configuration.
 

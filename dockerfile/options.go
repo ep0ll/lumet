@@ -96,6 +96,16 @@ func WithPayload(value any) Option {
 	}
 }
 
+// WithCommand attaches a shell-form or exec-form command payload.
+func WithCommand(command Command) Option {
+	return WithPayload(command.Clone())
+}
+
+// WithSource attaches a typed image, stage, named-context, or scratch source.
+func WithSource(source Source) Option {
+	return WithPayload(source.Clone())
+}
+
 // WithExtension attaches an application-specific value without changing the
 // instruction schema or the package's public types.
 func WithExtension(name string, value any) Option {

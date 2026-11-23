@@ -320,6 +320,86 @@ func TestParseTokensStopsAtFirstPositionalAndPrefersExactNoPrefixFlag(t *testing
 	}
 }
 
+func TestParseTokensAllowsCommandOptionsAndFlaglessArguments(t *testing.T) {
+	registry, err := dockerfile.NewDefaultRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run, err := registry.New("RUN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments, err := run.ParseTokens("-v", "go", "test", "--version")
+	if err != nil {
+		t.Fatalf("ParseTokens(RUN) error = %v", err)
+	}
+	if fmt.Sprint(arguments) != "[-v go test --version]" {
+		t.Fatalf("RUN arguments = %v, want [-v go test --version]", arguments)
+	}
+
+	cmd, err := registry.New("CMD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments, err = cmd.ParseTokens("--version", "-v")
+	if err != nil {
+		t.Fatalf("ParseTokens(CMD) error = %v", err)
+	}
+	if fmt.Sprint(arguments) != "[--version -v]" {
+		t.Fatalf("CMD arguments = %v, want [--version -v]", arguments)
+	}
+}
+
+func TestOptionFactoriesSnapshotCallerValues(t *testing.T) {
+	registry, err := dockerfile.NewDefaultRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mounts := []string{"type=cache,target=/cache/original"}
+	flagValues := map[string]any{"mount": mounts}
+	flagsOption := dockerfile.WithFlags(flagValues)
+	mounts[0] = "type=cache,target=/cache/mutated"
+	flagValues["mount"] = []string{"type=cache,target=/cache/replaced"}
+
+	run, err := registry.NewWithOptions("RUN", nil, flagsOption)
+	if err != nil {
+		t.Fatalf("NewWithOptions(RUN) error = %v", err)
+	}
+	gotMounts, ok := run.Flags().Strings("mount")
+	if !ok || fmt.Sprint(gotMounts) != "[type=cache,target=/cache/original]" {
+		t.Fatalf("mount snapshot = %v, present = %v", gotMounts, ok)
+	}
+
+	args := []string{"echo", "original"}
+	command := dockerfile.Command{Form: dockerfile.CommandExec, Args: args}
+	commandOption := dockerfile.WithCommand(command)
+	args[1] = "mutated"
+	command.Args[0] = "replaced"
+
+	cmd, err := registry.NewWithOptions("CMD", nil, commandOption)
+	if err != nil {
+		t.Fatalf("NewWithOptions(CMD) error = %v", err)
+	}
+	payload, ok := cmd.Payload().(dockerfile.Command)
+	if !ok || fmt.Sprint(payload.Args) != "[echo original]" {
+		t.Fatalf("command payload = %#v", cmd.Payload())
+	}
+
+	source := dockerfile.Context("original-context")
+	sourceOption := dockerfile.WithSource(source)
+	source.Reference = "mutated-context"
+	from, err := registry.NewWithOptions("FROM", nil, sourceOption)
+	if err != nil {
+		t.Fatalf("NewWithOptions(FROM) error = %v", err)
+	}
+	sourcePayload, ok := from.Payload().(dockerfile.Source)
+	if !ok || sourcePayload.Reference != "original-context" {
+		t.Fatalf("source payload = %#v", from.Payload())
+	}
+}
+
 func TestCustomFlagParserAndTransactionalParsing(t *testing.T) {
 	type resourceLimit struct{ CPUMilli int }
 
