@@ -318,6 +318,72 @@ streaming should inject a Go-backed stream value at the embedding layer.
 Likewise, gateway Reference values are obtained from solve results rather
 than fabricated in Starlark.
 
+### Adapter source map
+
+| BuildKit gateway API | Starlark adapter |
+| --- | --- |
+| `frontend/gateway/client/client.go` | `starlark/gateway/client/client.go` |
+| `frontend/gateway/client/attestation.go` | `starlark/gateway/client/attestation.go` |
+| `solver/result.Result[Reference]` | `starlark/gateway/client/result.go` |
+| `Reference`, `Container`, `ContainerProcess` | `starlark/gateway/client/container.go` |
+| request/response structs and protobuf conversion | `starlark/gateway/client/types.go` |
+| invocation-scoped module loading | `starlark/modules/runtime.go` |
+
+### Adapter source map
+
+| BuildKit gateway API | Starlark adapter |
+| --- | --- |
+| `frontend/gateway/client/client.go` | `starlark/gateway/client/client.go` |
+| `frontend/gateway/client/attestation.go` | `starlark/gateway/client/attestation.go` |
+| `solver/result.Result[Reference]` | `starlark/gateway/client/result.go` |
+| `Reference`, `Container`, `ContainerProcess` | `starlark/gateway/client/container.go` |
+| request/response structs and protobuf conversion | `starlark/gateway/client/types.go` |
+| invocation-scoped module loading | `starlark/modules/runtime.go` |
+
+
+### Minimal Starlark-Go embedding example
+
+Starlark-Go extensions are Go values and builtins, not reflected Python objects.
+A Go value that should support `x.field` implements `starlark.Value` and
+`starlark.HasAttrs`; a Go function is exposed with `starlark.NewBuiltin`.
+Modules are immutable `StringDict` globals returned by `Thread.Load`:
+
+~~~go
+hello := starlark.NewBuiltin("hello", func(
+    _ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple,
+) (starlark.Value, error) {
+    var name string
+    if err := starlark.UnpackArgs("hello", args, kwargs, "name", &name); err != nil {
+        return nil, err
+    }
+    return starlark.String("hello, " + name), nil
+})
+
+demo := starlark.StringDict{"hello": hello}
+demo.Freeze()
+thread := &starlark.Thread{
+    Name: "lumet",
+    Load: func(_ *starlark.Thread, name string) (starlark.StringDict, error) {
+        if name == "demo" {
+            return demo, nil
+        }
+        return nil, fmt.Errorf("unknown module %q", name)
+    },
+}
+globals, err := starlark.ExecFile(thread, "build.star", `
+load("demo", "hello")
+message = hello(name = "BuildKit")
+`, nil)
+if err != nil {
+    return err
+}
+fmt.Println(globals["message"])
+~~~
+
+The official `starlark/example_test.go` is the reference for minimal embedding,
+custom builtins, and sequential/parallel `load()` caching; Lumet adds
+thread-local context, cycle detection, execution limits, and dynamic gateway
+client scoping on top of those primitives.
 ## Starlark-Go embedding notes
 
 The adapter intentionally uses only the public go.starlark.net packages.
