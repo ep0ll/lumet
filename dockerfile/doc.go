@@ -46,6 +46,10 @@
 // public so callers can define reusable options and future instruction flags
 // can be added without changing the instruction constructor signatures.
 //
+// ONBUILD writes trigger expressions to the image config for a downstream
+// Dockerfile frontend to consume. This package does not parse Dockerfile text,
+// so it does not interpret or execute pre-existing ONBUILD trigger strings.
+//
 // StopSignal accepts os.Signal. On Unix, syscall.Signal values are stored as
 // their numeric signal numbers; other os.Signal implementations use String().
 package dockerfile
