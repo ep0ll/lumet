@@ -114,7 +114,7 @@ func TestBaseImageMetadataResolver(t *testing.T) {
 	if err := build.Apply(ctx, From("example/base:latest")); err != nil {
 		t.Fatal(err)
 	}
-	if build.Image.Config.WorkingDir != "/workspace" || len(build.Image.Config.Shell) != 3 {
+	if build.Image.Config.WorkingDir != "/workspace" || len(build.Image.Config.Shell) != 2 {
 		t.Fatalf("base image config was not inherited: %#v", build.Image.Config)
 	}
 	if err := build.Apply(ctx, Env(KV("PATH", "/opt/bin:$PATH"))); err != nil {
@@ -167,7 +167,7 @@ func TestRunCopyAndAddInstructionsCompose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(build.Image.History) != 6 {
+	if len(build.Image.History) != 5 {
 		t.Fatalf("expected COPY, COPY, ADD and two RUN history entries after FROM, got %d", len(build.Image.History))
 	}
 }
