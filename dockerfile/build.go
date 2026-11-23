@@ -291,6 +291,17 @@ func cloneStage(src Stage) Stage {
 	}
 }
 
+func environmentFromConfig(values []string) map[string]string {
+	environment := make(map[string]string, len(values))
+	for _, item := range values {
+		key, value, found := strings.Cut(item, "=")
+		if found {
+			environment[key] = value
+		}
+	}
+	return environment
+}
+
 func emptyImage(platform ocispecs.Platform) dockerspec.DockerOCIImage {
 	image := dockerspec.DockerOCIImage{}
 	image.OS = platform.OS
