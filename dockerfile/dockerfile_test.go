@@ -156,6 +156,7 @@ func TestRunCopyAndAddInstructionsCompose(t *testing.T) {
 		From("scratch"),
 		Copy([]string{"./src/main.go"}, "/app/", Parents(), Chmod(0o644)),
 		Copy([]string{"assets"}, "/app/", Link(), Chown("1000:1000")),
+		Copy([]string{"/etc/os-release"}, "/etc/", CopyFrom("busybox:latest")),
 		Add([]AddSource{
 			LocalSource("archive.tar"),
 			RemoteSource("https://example.com/assets.tar"),
@@ -167,8 +168,15 @@ func TestRunCopyAndAddInstructionsCompose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(build.Image.History) != 5 {
-		t.Fatalf("expected COPY, COPY, ADD and two RUN history entries after FROM, got %d", len(build.Image.History))
+	if len(build.Image.History) != 6 {
+		t.Fatalf("expected three COPY operations, ADD and two RUN history entries after FROM, got %d", len(build.Image.History))
+	}
+	definition, err := build.State.Marshal(context.Background())
+	if err != nil {
+		t.Fatalf("marshal LLB definition: %v", err)
+	}
+	if len(definition.Def) == 0 {
+		t.Fatal("expected a non-empty LLB definition")
 	}
 }
 
