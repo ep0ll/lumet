@@ -54,7 +54,7 @@ func From(reference string, opts ...Option) Instruction {
 		}
 		b.saveStage()
 
-		ref := b.expand(reference)
+		ref := b.expandGlobal(reference)
 		if ref == "" && options.BaseState == nil {
 			return fmt.Errorf("FROM: image reference cannot be empty")
 		}
@@ -120,6 +120,7 @@ func From(reference string, opts ...Option) Instruction {
 		b.State = state
 		b.Image = image
 		b.Platform = platform
+		b.stageArgs = make(map[string]string)
 		b.stageName = options.StageName
 		b.started = true
 		return nil
@@ -135,13 +136,25 @@ func Arg(name string, opts ...Option) Instruction {
 			return fmt.Errorf("ARG: name cannot be empty")
 		}
 		value, exists := b.BuildArgs[name]
+		if b.started && !exists {
+			value, exists = b.globalArgs[name]
+		}
 		if !exists && options.ArgDefault != nil {
-			value = b.expand(*options.ArgDefault)
-			b.BuildArgs[name] = value
+			if b.started {
+				value = b.expand(*options.ArgDefault)
+			} else {
+				value = b.expandGlobal(*options.ArgDefault)
+			}
 			exists = true
 		}
-		if exists && b.started {
+		if !exists {
+			value = ""
+		}
+		if b.started {
+			b.stageArgs[name] = value
 			b.State = b.State.AddEnv(name, value)
+		} else {
+			b.globalArgs[name] = value
 		}
 		return b.recordHistory(ctx, "ARG "+name, true)
 	}
