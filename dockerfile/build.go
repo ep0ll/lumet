@@ -264,9 +264,6 @@ func (b *Build) recordHistory(ctx context.Context, createdBy string, emptyLayer 
 	if !b.started {
 		return nil
 	}
-	if !emptyLayer {
-		createdBy += " # buildkit"
-	}
 	var created *time.Time
 	if b.createdAt != nil {
 		t := *b.createdAt
