@@ -76,7 +76,7 @@ func optionBuiltins() map[string]starlark.Value {
 		"GitAdvice": boolOption("GitAdvice", "GitOption", buildkitllb.GitAdvice),
 		"GitDebugCommands": boolOption("GitDebugCommands", "GitOption", buildkitllb.GitDebugCommands),
 		"KeepGitDir": optionBuiltin("KeepGitDir", func(starlark.Tuple) (any, error) { return buildkitllb.KeepGitDir(), nil }, 0, 0, "GitOption"),
-		"AuthTokenSecret": stringOption("AuthTokenSecret", "AuthOption", buildkitllb.AuthTokenSecret),
+		"AuthTokenSecret": stringOption("AuthTokenSecret", "GitOption", buildkitllb.AuthTokenSecret),
 		"AuthHeaderSecret": stringOption("AuthHeaderSecret", "AuthOption", buildkitllb.AuthHeaderSecret),
 		"KnownSSHHosts": stringOption("KnownSSHHosts", "GitOption", buildkitllb.KnownSSHHosts),
 		"MountSSHSock": stringOption("MountSSHSock", "GitOption", buildkitllb.MountSSHSock),
@@ -117,6 +117,8 @@ func optionBuiltins() map[string]starlark.Value {
 		}, 2, 2, "ImageBlobOption"),
 		"Checksum": optionBuiltin("Checksum", checksumOption, 1, 1, "HTTPOption"),
 		"HTTPChecksum": optionBuiltin("HTTPChecksum", checksumOption, 1, 1, "HTTPOption"),
+		"Header": builtin("Header", httpHeaderBuiltin),
+		"VerifyPGPSignature": optionBuiltin("VerifyPGPSignature", verifyPGPSignatureOption, 2, 2, "HTTPOption"),
 		"OCIChecksum": optionBuiltin("OCIChecksum", ociChecksumOption, 1, 1, "OCILayoutOption"),
 		"WithImageChecksum": optionBuiltin("WithImageChecksum", imageChecksumOption, 1, 1, "ImageOption"),
 		"WithLayerLimit": intOption("WithLayerLimit", "ImageOption", buildkitllb.WithLayerLimit),
@@ -425,4 +427,27 @@ func requireOption(args starlark.Tuple) (any, error) {
 		}
 	}
 	return buildkitllb.Require(filters...), nil
+}
+
+
+func httpHeaderBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var header buildkitllb.HTTPHeader
+	if err := starlark.UnpackArgs("Header", args, kwargs,
+		"accept?", &header.Accept,
+		"user_agent?", &header.UserAgent,
+	); err != nil {
+		return nil, err
+	}
+	return &optionValue{kind: "HTTPOption", value: buildkitllb.Header(header)}, nil
+}
+
+func verifyPGPSignatureOption(args starlark.Tuple) (any, error) {
+	pubKey, err := bytesAt("VerifyPGPSignature", args, 0)
+	if err != nil { return nil, err }
+	signature, err := bytesAt("VerifyPGPSignature", args, 1)
+	if err != nil { return nil, err }
+	return buildkitllb.VerifyPGPSignature(buildkitllb.HTTPSignatureInfo{
+		PubKey: pubKey,
+		Signature: signature,
+	}), nil
 }
