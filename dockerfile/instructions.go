@@ -178,11 +178,14 @@ func Env(values ...KeyValue) Instruction {
 			return err
 		}
 		parts := make([]string, 0, len(values))
+		// Dockerfile variable replacement for a single ENV instruction uses
+		// the environment that existed before the instruction is applied.
+		previousEnv := append([]string(nil), b.Image.Config.Env...)
 		for _, item := range values {
 			if item.Key == "" {
 				return fmt.Errorf("ENV: key cannot be empty")
 			}
-			value := b.expand(item.Value)
+			value := expandVariables(item.Value, b.stageArgs, previousEnv)
 			b.State = b.State.AddEnv(item.Key, value)
 			b.Image.Config.Env = setEnv(b.Image.Config.Env, item.Key, value)
 			parts = append(parts, item.Key+"="+value)
