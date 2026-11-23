@@ -39,6 +39,18 @@
 // LLB graph can still resolve the image, but Build.Image starts with empty
 // metadata for that external base image.
 //
+// Variable expansion is provided by the independent dockerfile/expand package.
+// WithEscapeToken selects backslash or backtick source escaping, while
+// WithVariableExpander allows callers to replace the expansion strategy.
+// The expander receives a per-instruction lookup, so it does not own or mutate
+// the Build environment.
+//
+// Apply emits started, completed and failed events through a progress.Reporter.
+// Events include instruction position, stage position, stage name and target
+// platform. WithProgressReporter connects the event stream to a CLI, telemetry
+// system, BuildKit UI adapter or any other consumer. RUN accepts ProgressGroup
+// and ProgressTitle instruction options for finer-grained presentation.
+//
 // BuildKit-specific behavior is deliberately exposed instead of being copied
 // into this package. RunOptions forwards llb.RunOption values (mounts, network,
 // security, secrets, SSH, ulimits and devices); CopyOptions and LLBConstraints
