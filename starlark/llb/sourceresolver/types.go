@@ -131,7 +131,7 @@ func (v *SourceOpValue) Attr(name string)(starlark.Value,error){
 	default:return nil,nil
 	}
 }
-func (v *SourceOpValue) AttrNames()[]string{return starlarkllb.SnakeCaseNames([]string{"identifier","attrs","identifier","attrs"})}
+func (v *SourceOpValue) AttrNames()[]string{return []string{"identifier", "attrs"}}
 func (v *SourceOpValue) Unwrap()*pb.SourceOp { if v==nil{return nil};return v.op }
 
 func optBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
@@ -139,7 +139,7 @@ func optBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwarg
 	var opt buildkitsourceresolver.Opt
 	for _,kw:=range kwargs{
 		key,ok:=kw[0].(starlark.String);if !ok{return nil,fmt.Errorf("opt: field names must be strings")}
-		switch starlarkllb.SnakeCaseIdentifier(string(key)){
+		switch string(key){
 		case "log_name":
 			value,err:=stringArg("opt.log_name",kw[1]);if err!=nil{return nil,err};opt.LogName=value
 		case "image":
