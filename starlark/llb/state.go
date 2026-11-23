@@ -172,6 +172,28 @@ func (v *OpMetadataValue) Attr(name string) (starlark.Value, error) {
 		return nil, fmt.Errorf("llb.OpMetadata: nil receiver")
 	}
 	switch name {
+	case "ToPB", "to_pb":
+		return boundBuiltin("OpMetadata.ToPB", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("OpMetadata.ToPB", args, kwargs, 0, 0); err != nil { return nil, err }
+			return WrapOpMetadataProto(v.metadata.ToPB()), nil
+		}), nil
+	case "FromPB", "from_pb":
+		return boundBuiltin("OpMetadata.FromPB", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("OpMetadata.FromPB", args, kwargs, 1, 1); err != nil { return nil, err }
+			protoValue, ok := args[0].(*OpMetadataProtoValue)
+			if !ok || protoValue == nil || protoValue.metadata == nil {
+				return nil, fmt.Errorf("OpMetadata.FromPB: got %s, want llb.OpMetadataPB", valueType(args[0]))
+			}
+			metadata := buildkitllb.OpMetadata{}
+			metadata.FromPB(protoValue.metadata)
+			return WrapOpMetadata(metadata), nil
+		}), nil
+	case "caps", "Caps":
+		dict := starlark.NewDict(len(v.metadata.Caps))
+		for key, enabled := range v.metadata.Caps {
+			if err := dict.SetKey(starlark.String(string(key)), starlark.Bool(enabled)); err != nil { return nil, err }
+		}
+		return dict, nil
 	case "ignore_cache", "IgnoreCache":
 		return starlark.Bool(v.metadata.IgnoreCache), nil
 	case "description", "Description":
@@ -210,8 +232,8 @@ func (v *OpMetadataValue) Attr(name string) (starlark.Value, error) {
 
 func (v *OpMetadataValue) AttrNames() []string {
 	return []string{
-		"Description", "ExportCache", "IgnoreCache", "LinuxResources", "ProgressGroup",
-		"description", "export_cache", "ignore_cache", "linux_resources", "progress_group",
+		"Caps", "Description", "ExportCache", "IgnoreCache", "LinuxResources", "ProgressGroup", "ToPB", "FromPB",
+		"caps", "description", "export_cache", "ignore_cache", "linux_resources", "progress_group", "to_pb", "from_pb",
 	}
 }
 
