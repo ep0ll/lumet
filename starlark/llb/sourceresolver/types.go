@@ -36,7 +36,6 @@ func (v *recordValue) Freeze() { v.fields.Freeze() }
 func (v *recordValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
 func (v *recordValue) Hash() (uint32,error) { return 0, fmt.Errorf("unhashable: sourceresolver.%s", v.name) }
 func (v *recordValue) Attr(name string) (starlark.Value,error) {
-	name = starlarkllb.SnakeCaseIdentifier(name)
 	if v == nil { return nil, fmt.Errorf("sourceresolver: nil %s", name) }
 	if value, ok := v.fields[name]; ok { return value,nil }
 	return nil,nil
@@ -92,7 +91,7 @@ func bytesArg(name string, value starlark.Value) ([]byte,error) {
 func platformArg(name string, value starlark.Value) (*ocispecs.Platform,error) {
 	if value==starlark.None { return nil,nil }
 	v,ok:=value.(*starlarkllb.OCIPlatformValue)
-	if !ok || v==nil { return nil,fmt.Errorf("%s: got %s, want llb.oci_platform or None",name,starlarkType(value)) }
+	if !ok || v==nil { return nil,fmt.Errorf("%s: got %s, want llb.oci_platform or none",name,starlarkType(value)) }
 	p:=v.Unwrap()
 	return &p,nil
 }
@@ -100,14 +99,14 @@ func platformArg(name string, value starlark.Value) (*ocispecs.Platform,error) {
 func sourceOpBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error) {
 	var identifier string
 	var attrsValue starlark.Value = starlark.None
-	if err:=starlarkllb.UnpackArgs("SourceOp",args,kwargs,"identifier",&identifier,"attrs?",&attrsValue); err!=nil { return nil,err }
+	if err:=starlarkllb.UnpackArgs("source_op",args,kwargs,"identifier",&identifier,"attrs?",&attrsValue); err!=nil { return nil,err }
 	attrs:=map[string]string{}
 	if attrsValue!=starlark.None {
 		dict,ok:=attrsValue.(*starlark.Dict)
-		if !ok { return nil,fmt.Errorf("SourceOp.attrs: got %s, want dict",starlarkType(attrsValue)) }
+		if !ok { return nil,fmt.Errorf("source_op.attrs: got %s, want dict",starlarkType(attrsValue)) }
 		for _,item:=range dict.Items() {
-			key,err:=stringArg("SourceOp.attrs key",item[0]); if err!=nil{return nil,err}
-			value,err:=stringArg("SourceOp.attrs value",item[1]); if err!=nil{return nil,err}
+			key,err:=stringArg("source_op.attrs key",item[0]); if err!=nil{return nil,err}
+			value,err:=stringArg("source_op.attrs value",item[1]); if err!=nil{return nil,err}
 			attrs[key]=value
 		}
 	}
@@ -122,50 +121,49 @@ func (v *SourceOpValue) Freeze() {}
 func (v *SourceOpValue) Truth() starlark.Bool { return starlark.Bool(v!=nil && v.op!=nil) }
 func (v *SourceOpValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: sourceresolver.source_op")}
 func (v *SourceOpValue) Attr(name string)(starlark.Value,error){
-	name = starlarkllb.SnakeCaseIdentifier(name)
 	if v==nil||v.op==nil{return nil,fmt.Errorf("sourceresolver.source_op: nil receiver")}
 	switch name {
-	case "identifier","Identifier":return starlark.String(v.op.Identifier),nil
-	case "attrs","Attrs":
+	case "identifier":return starlark.String(v.op.Identifier),nil
+	case "attrs":
 		d:=starlark.NewDict(len(v.op.Attrs))
 		for k,val:=range v.op.Attrs { _=d.SetKey(starlark.String(k),starlark.String(val)) }
 		return d,nil
 	default:return nil,nil
 	}
 }
-func (v *SourceOpValue) AttrNames()[]string{return starlarkllb.SnakeCaseNames([]string{"identifier","attrs","Identifier","Attrs"})}
+func (v *SourceOpValue) AttrNames()[]string{return starlarkllb.SnakeCaseNames([]string{"identifier","attrs","identifier","attrs"})}
 func (v *SourceOpValue) Unwrap()*pb.SourceOp { if v==nil{return nil};return v.op }
 
 func optBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	if len(args)!=0{return nil,fmt.Errorf("Opt: use named arguments")}
+	if len(args)!=0{return nil,fmt.Errorf("opt: use named arguments")}
 	var opt buildkitsourceresolver.Opt
 	for _,kw:=range kwargs{
-		key,ok:=kw[0].(starlark.String);if !ok{return nil,fmt.Errorf("Opt: field names must be strings")}
+		key,ok:=kw[0].(starlark.String);if !ok{return nil,fmt.Errorf("opt: field names must be strings")}
 		switch starlarkllb.SnakeCaseIdentifier(string(key)){
 		case "log_name":
-			value,err:=stringArg("Opt.log_name",kw[1]);if err!=nil{return nil,err};opt.LogName=value
+			value,err:=stringArg("opt.log_name",kw[1]);if err!=nil{return nil,err};opt.LogName=value
 		case "image":
 			if kw[1]==starlark.None {opt.ImageOpt=nil;continue}
-			value,err:=recordFrom[buildkitsourceresolver.ResolveImageOpt](kw[1],"ResolveImageOpt");if err!=nil{return nil,err};opt.ImageOpt=&value
+			value,err:=recordFrom[buildkitsourceresolver.ResolveImageOpt](kw[1],"resolve_image_opt");if err!=nil{return nil,err};opt.ImageOpt=&value
 		case "git":
 			if kw[1]==starlark.None {opt.GitOpt=nil;continue}
-			value,err:=recordFrom[buildkitsourceresolver.ResolveGitOpt](kw[1],"ResolveGitOpt");if err!=nil{return nil,err};opt.GitOpt=&value
+			value,err:=recordFrom[buildkitsourceresolver.ResolveGitOpt](kw[1],"resolve_git_opt");if err!=nil{return nil,err};opt.GitOpt=&value
 		case "http":
 			if kw[1]==starlark.None {opt.HTTPOpt=nil;continue}
-			value,err:=recordFrom[buildkitsourceresolver.ResolveHTTPOpt](kw[1],"ResolveHTTPOpt");if err!=nil{return nil,err};opt.HTTPOpt=&value
+			value,err:=recordFrom[buildkitsourceresolver.ResolveHTTPOpt](kw[1],"resolve_http_opt");if err!=nil{return nil,err};opt.HTTPOpt=&value
 		case "oci_layout":
 			if kw[1]==starlark.None {opt.OCILayoutOpt=nil;continue}
-			value,err:=recordFrom[buildkitsourceresolver.ResolveOCILayoutOpt](kw[1],"ResolveOCILayoutOpt");if err!=nil{return nil,err};opt.OCILayoutOpt=&value
+			value,err:=recordFrom[buildkitsourceresolver.ResolveOCILayoutOpt](kw[1],"resolve_oci_layout_opt");if err!=nil{return nil,err};opt.OCILayoutOpt=&value
 		case "source_policies":
-			list,ok:=kw[1].(starlark.Indexable);if !ok{return nil,fmt.Errorf("Opt.source_policies: got %s, want list",starlarkType(kw[1]))}
+			list,ok:=kw[1].(starlark.Indexable);if !ok{return nil,fmt.Errorf("opt.source_policies: got %s, want list",starlarkType(kw[1]))}
 			opt.SourcePolicies=make([]*sourcepolicy.Policy,list.Len())
 			for i:=0;i<list.Len();i++{
-				data,err:=bytesArg("Opt.source_policies",list.Index(i));if err!=nil{return nil,err}
+				data,err:=bytesArg("opt.source_policies",list.Index(i));if err!=nil{return nil,err}
 				policy:=&sourcepolicy.Policy{}
-				if err:=proto.Unmarshal(data,policy);err!=nil{return nil,fmt.Errorf("Opt.source_policies[%d]: %w",i,err)}
+				if err:=proto.Unmarshal(data,policy);err!=nil{return nil,fmt.Errorf("opt.source_policies[%d]: %w",i,err)}
 				opt.SourcePolicies[i]=policy
 			}
-		default:return nil,fmt.Errorf("Opt: unknown field %q",key)
+		default:return nil,fmt.Errorf("opt: unknown field %q",key)
 		}
 	}
 	return starlarkllb.WrapSourceResolverOpt(opt),nil
@@ -176,57 +174,57 @@ func resolveImageOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark
 	var resolveMode string
 	var noConfig,attestationChain bool
 	var attestations []string
-	if err:=starlarkllb.UnpackArgs("ResolveImageOpt",args,kwargs,
+	if err:=starlarkllb.UnpackArgs("resolve_image_opt",args,kwargs,
 		"platform?",&platformValue,"resolve_mode?",&resolveMode,"no_config?",&noConfig,
 		"attestation_chain?",&attestationChain,"resolve_attestations?",&attestations);err!=nil{return nil,err}
-	platform,err:=platformArg("ResolveImageOpt.platform",platformValue);if err!=nil{return nil,err}
+	platform,err:=platformArg("resolve_image_opt.platform",platformValue);if err!=nil{return nil,err}
 	opt:=buildkitsourceresolver.ResolveImageOpt{Platform:platform,ResolveMode:resolveMode,NoConfig:noConfig,AttestationChain:attestationChain,ResolveAttestations:attestations}
-	return newRecord("ResolveImageOpt",opt,starlark.StringDict{
+	return newRecord("resolve_image_opt",opt,starlark.StringDict{
 		"platform":platformValue,"resolve_mode":starlark.String(resolveMode),"no_config":boolField(noConfig),
 		"attestation_chain":boolField(attestationChain),"resolve_attestations":stringList(attestations),
 	}),nil
 }
 func resolveGitOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var returnObject bool
-	if err:=starlarkllb.UnpackArgs("ResolveGitOpt",args,kwargs,"return_object?",&returnObject);err!=nil{return nil,err}
+	if err:=starlarkllb.UnpackArgs("resolve_git_opt",args,kwargs,"return_object?",&returnObject);err!=nil{return nil,err}
 	opt:=buildkitsourceresolver.ResolveGitOpt{ReturnObject:returnObject}
-	return newRecord("ResolveGitOpt",opt,starlark.StringDict{"return_object":boolField(returnObject)}),nil
+	return newRecord("resolve_git_opt",opt,starlark.StringDict{"return_object":boolField(returnObject)}),nil
 }
 func resolveHTTPOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var requestValue starlark.Value=starlark.None
-	if err:=starlarkllb.UnpackArgs("ResolveHTTPOpt",args,kwargs,"checksum_req?",&requestValue);err!=nil{return nil,err}
+	if err:=starlarkllb.UnpackArgs("resolve_http_opt",args,kwargs,"checksum_req?",&requestValue);err!=nil{return nil,err}
 	var request *buildkitsourceresolver.ResolveHTTPChecksumRequest
 	if requestValue!=starlark.None{
-		v,err:=recordFrom[buildkitsourceresolver.ResolveHTTPChecksumRequest](requestValue,"ResolveHTTPChecksumRequest");if err!=nil{return nil,err}
+		v,err:=recordFrom[buildkitsourceresolver.ResolveHTTPChecksumRequest](requestValue,"resolve_http_checksum_request");if err!=nil{return nil,err}
 		request=&v
 	}
 	opt:=buildkitsourceresolver.ResolveHTTPOpt{ChecksumReq:request}
 	fields:=starlark.StringDict{"checksum_req":requestValue}
-	return newRecord("ResolveHTTPOpt",opt,fields),nil
+	return newRecord("resolve_http_opt",opt,fields),nil
 }
 func resolveOCILayoutOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var platformValue starlark.Value=starlark.None
 	var storeValue starlark.Value=starlark.None
-	if err:=starlarkllb.UnpackArgs("ResolveOCILayoutOpt",args,kwargs,"platform?",&platformValue,"store?",&storeValue);err!=nil{return nil,err}
-	platform,err:=platformArg("ResolveOCILayoutOpt.platform",platformValue);if err!=nil{return nil,err}
+	if err:=starlarkllb.UnpackArgs("resolve_oci_layout_opt",args,kwargs,"platform?",&platformValue,"store?",&storeValue);err!=nil{return nil,err}
+	platform,err:=platformArg("resolve_oci_layout_opt.platform",platformValue);if err!=nil{return nil,err}
 	var store buildkitsourceresolver.ResolveImageConfigOptStore
 	if storeValue!=starlark.None{
-		value,err:=recordFrom[buildkitsourceresolver.ResolveImageConfigOptStore](storeValue,"ResolveImageConfigOptStore");if err!=nil{return nil,err}
+		value,err:=recordFrom[buildkitsourceresolver.ResolveImageConfigOptStore](storeValue,"resolve_image_config_opt_store");if err!=nil{return nil,err}
 		store=value
 	}
 	opt:=buildkitsourceresolver.ResolveOCILayoutOpt{Platform:platform,Store:store}
-	return newRecord("ResolveOCILayoutOpt",opt,starlark.StringDict{"platform":platformValue,"store":storeValue}),nil
+	return newRecord("resolve_oci_layout_opt",opt,starlark.StringDict{"platform":platformValue,"store":storeValue}),nil
 }
 func resolveImageConfigStoreBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var sessionID,storeID string
-	if err:=starlarkllb.UnpackArgs("ResolveImageConfigOptStore",args,kwargs,"session_id?",&sessionID,"store_id?",&storeID);err!=nil{return nil,err}
+	if err:=starlarkllb.UnpackArgs("resolve_image_config_opt_store",args,kwargs,"session_id?",&sessionID,"store_id?",&storeID);err!=nil{return nil,err}
 	store:=buildkitsourceresolver.ResolveImageConfigOptStore{SessionID:sessionID,StoreID:storeID}
-	return newRecord("ResolveImageConfigOptStore",store,starlark.StringDict{"session_id":stringField("session_id",sessionID),"store_id":stringField("store_id",storeID)}),nil
+	return newRecord("resolve_image_config_opt_store",store,starlark.StringDict{"session_id":stringField("session_id",sessionID),"store_id":stringField("store_id",storeID)}),nil
 }
 func resolveHTTPChecksumRequestBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var algo int
 	var suffixValue starlark.Value = starlark.None
-	if err := starlarkllb.UnpackArgs("ResolveHTTPChecksumRequest", args, kwargs,
+	if err := starlarkllb.UnpackArgs("resolve_http_checksum_request", args, kwargs,
 		"algo?", &algo, "suffix?", &suffixValue,
 	); err != nil {
 		return nil, err
@@ -234,41 +232,41 @@ func resolveHTTPChecksumRequestBuiltin(_ *starlark.Thread, _ *starlark.Builtin, 
 	var suffix []byte
 	if suffixValue != starlark.None {
 		var err error
-		suffix, err = bytesArg("ResolveHTTPChecksumRequest.suffix", suffixValue)
+		suffix, err = bytesArg("resolve_http_checksum_request.suffix", suffixValue)
 		if err != nil { return nil, err }
 	}
 	request := buildkitsourceresolver.ResolveHTTPChecksumRequest{
 		Algo: buildkitsourceresolver.ResolveHTTPChecksumAlgo(algo),
 		Suffix: suffix,
 	}
-	return newRecord("ResolveHTTPChecksumRequest", request, starlark.StringDict{
+	return newRecord("resolve_http_checksum_request", request, starlark.StringDict{
 		"algo": intField(algo), "suffix": bytesField(suffix),
 	}), nil
 }
 
 func resolverTypeValues()map[string]starlark.Value{
 	return map[string]starlark.Value{
-		"ResolverTypeRegistry":starlark.MakeInt(int(buildkitsourceresolver.ResolverTypeRegistry)),
-		"ResolverTypeOCILayout":starlark.MakeInt(int(buildkitsourceresolver.ResolverTypeOCILayout)),
+		"resolver_type_registry":starlark.MakeInt(int(buildkitsourceresolver.ResolverTypeRegistry)),
+		"resolver_type_oci_layout":starlark.MakeInt(int(buildkitsourceresolver.ResolverTypeOCILayout)),
 	}
 }
 func checksumAlgoValues()map[string]starlark.Value{
 	return map[string]starlark.Value{
-		"ResolveHTTPChecksumAlgoSHA256":starlark.MakeInt(int(buildkitsourceresolver.ResolveHTTPChecksumAlgoSHA256)),
-		"ResolveHTTPChecksumAlgoSHA384":starlark.MakeInt(int(buildkitsourceresolver.ResolveHTTPChecksumAlgoSHA384)),
-		"ResolveHTTPChecksumAlgoSHA512":starlark.MakeInt(int(buildkitsourceresolver.ResolveHTTPChecksumAlgoSHA512)),
+		"resolve_http_checksum_algo_sha256":starlark.MakeInt(int(buildkitsourceresolver.ResolveHTTPChecksumAlgoSHA256)),
+		"resolve_http_checksum_algo_sha384":starlark.MakeInt(int(buildkitsourceresolver.ResolveHTTPChecksumAlgoSHA384)),
+		"resolve_http_checksum_algo_sha512":starlark.MakeInt(int(buildkitsourceresolver.ResolveHTTPChecksumAlgoSHA512)),
 	}
 }
 func sourceResolverTypesBuiltins()map[string]starlark.Value{
 	return map[string]starlark.Value{
-		"SourceOp":builtin("SourceOp",sourceOpBuiltin),
-		"Opt":builtin("Opt",optBuiltin),
-		"ResolveImageOpt":builtin("ResolveImageOpt",resolveImageOptBuiltin),
-		"ResolveGitOpt":builtin("ResolveGitOpt",resolveGitOptBuiltin),
-		"ResolveHTTPOpt":builtin("ResolveHTTPOpt",resolveHTTPOptBuiltin),
-		"ResolveOCILayoutOpt":builtin("ResolveOCILayoutOpt",resolveOCILayoutOptBuiltin),
-		"ResolveImageConfigOptStore":builtin("ResolveImageConfigOptStore",resolveImageConfigStoreBuiltin),
-		"ResolveHTTPChecksumRequest":builtin("ResolveHTTPChecksumRequest",resolveHTTPChecksumRequestBuiltin),
+		"source_op":builtin("source_op",sourceOpBuiltin),
+		"opt":builtin("opt",optBuiltin),
+		"resolve_image_opt":builtin("resolve_image_opt",resolveImageOptBuiltin),
+		"resolve_git_opt":builtin("resolve_git_opt",resolveGitOptBuiltin),
+		"resolve_http_opt":builtin("resolve_http_opt",resolveHTTPOptBuiltin),
+		"resolve_oci_layout_opt":builtin("resolve_oci_layout_opt",resolveOCILayoutOptBuiltin),
+		"resolve_image_config_opt_store":builtin("resolve_image_config_opt_store",resolveImageConfigStoreBuiltin),
+		"resolve_http_checksum_request":builtin("resolve_http_checksum_request",resolveHTTPChecksumRequestBuiltin),
 	}
 }
 

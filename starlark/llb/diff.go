@@ -19,29 +19,28 @@ func (v *DiffOpValue) Freeze(){}
 func (v *DiffOpValue) Truth()starlark.Bool{return starlark.Bool(v!=nil&&v.op!=nil)}
 func (v *DiffOpValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llb.diff_op")}
 func (v *DiffOpValue) Attr(name string)(starlark.Value,error){
-	name = SnakeCaseIdentifier(name)
-	if v==nil||v.op==nil{return nil,fmt.Errorf("llb.diff_op: nil receiver")}
+		if v==nil||v.op==nil{return nil,fmt.Errorf("llb.diff_op: nil receiver")}
 	switch name{
-	case "Output","output":
-		return boundBuiltin("DiffOp.Output",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("DiffOp.Output",args,kwargs,0,0);err!=nil{return nil,err}
+	case "output":
+		return boundBuiltin("diff_op.output",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("diff_op.output",args,kwargs,0,0);err!=nil{return nil,err}
 			output:=v.op.Output();if output==nil{return starlark.None,nil};return WrapOutput(output),nil
 		}),nil
-	case "Inputs","inputs":
-		return boundBuiltin("DiffOp.Inputs",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("DiffOp.Inputs",args,kwargs,0,0);err!=nil{return nil,err}
+	case "inputs":
+		return boundBuiltin("diff_op.inputs",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("diff_op.inputs",args,kwargs,0,0);err!=nil{return nil,err}
 			return outputListValue(v.op.Inputs()),nil
 		}),nil
-	case "Validate","validate":
-		return boundBuiltin("DiffOp.Validate",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("DiffOp.Validate",args,kwargs,0,-1);err!=nil{return nil,err}
+	case "validate":
+		return boundBuiltin("diff_op.validate",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("diff_op.validate",args,kwargs,0,-1);err!=nil{return nil,err}
 			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
 			if err:=v.op.Validate(callContext(thread),constraints);err!=nil{return nil,err}
 			return starlark.None,nil
 		}),nil
-	case "Marshal","marshal":
-		return boundBuiltin("DiffOp.Marshal",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("DiffOp.Marshal",args,kwargs,0,-1);err!=nil{return nil,err}
+	case "marshal":
+		return boundBuiltin("diff_op.marshal",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("diff_op.marshal",args,kwargs,0,-1);err!=nil{return nil,err}
 			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
 			dgst,data,metadata,sources,err:=v.op.Marshal(callContext(thread),constraints);if err!=nil{return nil,err}
 			return marshalResult(dgst,data,metadata,sources),nil
@@ -49,26 +48,26 @@ func (v *DiffOpValue) Attr(name string)(starlark.Value,error){
 	default:return nil,nil
 	}
 }
-func (v *DiffOpValue) AttrNames()[]string{return SnakeCaseNames([]string{"Output","Inputs","Validate","Marshal","output","inputs","validate","marshal"})}
+func (v *DiffOpValue) AttrNames()[]string{return SnakeCaseNames([]string{"output","inputs","validate","marshal","output","inputs","validate","marshal"})}
 
 func diffBuiltins()map[string]starlark.Value{
 	return map[string]starlark.Value{
-		"Diff":builtin("Diff",diffBuiltin),
-		"NewDiff":builtin("NewDiff",newDiffBuiltin),
+		"diff":builtin("diff",diffBuiltin),
+		"new_diff":builtin("new_diff",newDiffBuiltin),
 	}
 }
 func diffBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	if err:=arity("Diff",args,kwargs,2,-1);err!=nil{return nil,err}
+	if err:=arity("diff",args,kwargs,2,-1);err!=nil{return nil,err}
 	lower,err:=stateFromValue(args[0]);if err!=nil{return nil,err}
 	upper,err:=stateFromValue(args[1]);if err!=nil{return nil,err}
-	options,err:=optionsFromArgs[buildkitllb.ConstraintsOpt](args,2,"ConstraintsOpt");if err!=nil{return nil,err}
+	options,err:=optionsFromArgs[buildkitllb.ConstraintsOpt](args,2,"constraints_opt");if err!=nil{return nil,err}
 	return WrapState(buildkitllb.Diff(lower,upper,options...)),nil
 }
 func newDiffBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	if err:=arity("NewDiff",args,kwargs,3,3);err!=nil{return nil,err}
+	if err:=arity("new_diff",args,kwargs,3,3);err!=nil{return nil,err}
 	lower,err:=stateFromValue(args[0]);if err!=nil{return nil,err}
 	upper,err:=stateFromValue(args[1]);if err!=nil{return nil,err}
-	constraints,ok:=args[2].(*ConstraintsValue);if !ok||constraints==nil{return nil,fmt.Errorf("NewDiff: argument 3: want llb.constraints")}
+	constraints,ok:=args[2].(*ConstraintsValue);if !ok||constraints==nil{return nil,fmt.Errorf("new_diff: argument 3: want llb.constraints")}
 	return WrapDiffOp(buildkitllb.NewDiff(lower,upper,constraints.Unwrap())),nil
 }
 

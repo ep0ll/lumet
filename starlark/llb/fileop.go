@@ -32,59 +32,58 @@ func (v *FileActionValue) Truth() starlark.Bool  { return starlark.Bool(v != nil
 func (v *FileActionValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.file_action") }
 
 func (v *FileActionValue) Attr(name string) (starlark.Value, error) {
-	name = SnakeCaseIdentifier(name)
-	if v == nil || v.action == nil { return nil, fmt.Errorf("llb.file_action: nil receiver") }
+		if v == nil || v.action == nil { return nil, fmt.Errorf("llb.file_action: nil receiver") }
 	action := v.action
 	switch name {
-	case "Mkdir", "mkdir":
-		return boundBuiltin("FileAction.Mkdir", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("FileAction.Mkdir", args, kwargs, 2, -1); err != nil { return nil, err }
-			path, err := stringAt("FileAction.Mkdir", args, 0); if err != nil { return nil, err }
-			mode, err := intAt("FileAction.Mkdir", args, 1); if err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.MkdirOption](args, 2, "MkdirOption")
+	case "mkdir":
+		return boundBuiltin("file_action.mkdir", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("file_action.mkdir", args, kwargs, 2, -1); err != nil { return nil, err }
+			path, err := stringAt("file_action.mkdir", args, 0); if err != nil { return nil, err }
+			mode, err := intAt("file_action.mkdir", args, 1); if err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.MkdirOption](args, 2, "mkdir_option")
 			if err != nil { return nil, err }
 			return WrapFileAction(action.Mkdir(path, os.FileMode(mode), options...)), nil
 		}), nil
-	case "Mkfile", "mkfile":
-		return boundBuiltin("FileAction.Mkfile", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("FileAction.Mkfile", args, kwargs, 3, -1); err != nil { return nil, err }
-			path, err := stringAt("FileAction.Mkfile", args, 0); if err != nil { return nil, err }
-			mode, err := intAt("FileAction.Mkfile", args, 1); if err != nil { return nil, err }
-			data, err := bytesAt("FileAction.Mkfile", args, 2); if err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.MkfileOption](args, 3, "MkfileOption")
+	case "mkfile":
+		return boundBuiltin("file_action.mkfile", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("file_action.mkfile", args, kwargs, 3, -1); err != nil { return nil, err }
+			path, err := stringAt("file_action.mkfile", args, 0); if err != nil { return nil, err }
+			mode, err := intAt("file_action.mkfile", args, 1); if err != nil { return nil, err }
+			data, err := bytesAt("file_action.mkfile", args, 2); if err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.MkfileOption](args, 3, "mkfile_option")
 			if err != nil { return nil, err }
 			return WrapFileAction(action.Mkfile(path, os.FileMode(mode), data, options...)), nil
 		}), nil
-	case "Symlink", "symlink":
-		return boundBuiltin("FileAction.Symlink", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("FileAction.Symlink", args, kwargs, 2, -1); err != nil { return nil, err }
-			oldPath, err := stringAt("FileAction.Symlink", args, 0); if err != nil { return nil, err }
-			newPath, err := stringAt("FileAction.Symlink", args, 1); if err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.SymlinkOption](args, 2, "SymlinkOption")
+	case "symlink":
+		return boundBuiltin("file_action.symlink", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("file_action.symlink", args, kwargs, 2, -1); err != nil { return nil, err }
+			oldPath, err := stringAt("file_action.symlink", args, 0); if err != nil { return nil, err }
+			newPath, err := stringAt("file_action.symlink", args, 1); if err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.SymlinkOption](args, 2, "symlink_option")
 			if err != nil { return nil, err }
 			return WrapFileAction(action.Symlink(oldPath, newPath, options...)), nil
 		}), nil
-	case "Rm", "rm":
-		return boundBuiltin("FileAction.Rm", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("FileAction.Rm", args, kwargs, 1, -1); err != nil { return nil, err }
-			path, err := stringAt("FileAction.Rm", args, 0); if err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.RmOption](args, 1, "RmOption")
+	case "rm":
+		return boundBuiltin("file_action.rm", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("file_action.rm", args, kwargs, 1, -1); err != nil { return nil, err }
+			path, err := stringAt("file_action.rm", args, 0); if err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.RmOption](args, 1, "rm_option")
 			if err != nil { return nil, err }
 			return WrapFileAction(action.Rm(path, options...)), nil
 		}), nil
-	case "Copy", "copy":
-		return boundBuiltin("FileAction.Copy", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("FileAction.Copy", args, kwargs, 3, -1); err != nil { return nil, err }
+	case "copy":
+		return boundBuiltin("file_action.copy", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("file_action.copy", args, kwargs, 3, -1); err != nil { return nil, err }
 			input, err := copyInputFromValue(args[0]); if err != nil { return nil, err }
-			src, err := stringAt("FileAction.Copy", args, 1); if err != nil { return nil, err }
-			dest, err := stringAt("FileAction.Copy", args, 2); if err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.CopyOption](args, 3, "CopyOption")
+			src, err := stringAt("file_action.copy", args, 1); if err != nil { return nil, err }
+			dest, err := stringAt("file_action.copy", args, 2); if err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.CopyOption](args, 3, "copy_option")
 			if err != nil { return nil, err }
 			return WrapFileAction(action.Copy(input, src, dest, options...)), nil
 		}), nil
-	case "WithState", "with_state":
-		return boundBuiltin("FileAction.WithState", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("FileAction.WithState", args, kwargs, 1, 1); err != nil { return nil, err }
+	case "with_state":
+		return boundBuiltin("file_action.with_state", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("file_action.with_state", args, kwargs, 1, 1); err != nil { return nil, err }
 			state, err := stateFromValue(args[0]); if err != nil { return nil, err }
 			return wrapCopyInput(action.WithState(state)), nil
 		}), nil
@@ -94,7 +93,7 @@ func (v *FileActionValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *FileActionValue) AttrNames() []string {
-	return SnakeCaseNames([]string{"Copy", "Mkdir", "Mkfile", "Rm", "Symlink", "WithState",
+	return SnakeCaseNames([]string{"copy", "mkdir", "mkfile", "rm", "symlink", "with_state",
 		"copy", "mkdir", "mkfile", "rm", "symlink", "with_state"})
 }
 
@@ -149,32 +148,31 @@ func (v *FileOpValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && 
 func (v *FileOpValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.file_op") }
 
 func (v *FileOpValue) Attr(name string) (starlark.Value, error) {
-	name = SnakeCaseIdentifier(name)
-	if v == nil || v.op == nil { return nil, fmt.Errorf("llb.file_op: nil receiver") }
+		if v == nil || v.op == nil { return nil, fmt.Errorf("llb.file_op: nil receiver") }
 	switch name {
-	case "Output", "output":
-		return boundBuiltin("FileOp.Output", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("FileOp.Output", args, kwargs, 0, 0); err != nil { return nil, err }
+	case "output":
+		return boundBuiltin("file_op.output", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("file_op.output", args, kwargs, 0, 0); err != nil { return nil, err }
 			return WrapOutput(v.op.Output()), nil
 		}), nil
-	case "Inputs", "inputs":
-		return boundBuiltin("FileOp.Inputs", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("FileOp.Inputs", args, kwargs, 0, 0); err != nil { return nil, err }
+	case "inputs":
+		return boundBuiltin("file_op.inputs", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("file_op.inputs", args, kwargs, 0, 0); err != nil { return nil, err }
 			inputs := v.op.Inputs()
 			values := make([]starlark.Value, len(inputs))
 			for i, input := range inputs { values[i] = WrapOutput(input) }
 			return starlark.NewList(values), nil
 		}), nil
-	case "Validate", "validate":
-		return boundBuiltin("FileOp.Validate", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("FileOp.Validate", args, kwargs, 0, -1); err != nil { return nil, err }
+	case "validate":
+		return boundBuiltin("file_op.validate", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("file_op.validate", args, kwargs, 0, -1); err != nil { return nil, err }
 			constraints, err := constraintsFromArgs(args, 0); if err != nil { return nil, err }
 			if err := v.op.Validate(callContext(thread), constraints); err != nil { return nil, err }
 			return starlark.None, nil
 		}), nil
-	case "Marshal", "marshal":
-		return boundBuiltin("FileOp.Marshal", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("FileOp.Marshal", args, kwargs, 0, -1); err != nil { return nil, err }
+	case "marshal":
+		return boundBuiltin("file_op.marshal", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("file_op.marshal", args, kwargs, 0, -1); err != nil { return nil, err }
 			constraints, err := constraintsFromArgs(args, 0); if err != nil { return nil, err }
 			dgst, data, metadata, sources, err := v.op.Marshal(callContext(thread), constraints)
 			if err != nil { return nil, err }
@@ -186,24 +184,24 @@ func (v *FileOpValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *FileOpValue) AttrNames() []string {
-	return SnakeCaseNames([]string{"Inputs", "Marshal", "Output", "Validate", "inputs", "marshal", "output", "validate"})
+	return SnakeCaseNames([]string{"inputs", "marshal", "output", "validate", "inputs", "marshal", "output", "validate"})
 }
 
 func stateFileAttr(v *StateValue, name string) (starlark.Value, bool, error) {
-	if name != "File" && name != "file" { return nil, false, nil }
-	return boundBuiltin("State.File", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		if err := arity("State.File", args, kwargs, 1, -1); err != nil { return nil, err }
+	if name != "file" && name != "file" { return nil, false, nil }
+	return boundBuiltin("state.file", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		if err := arity("state.file", args, kwargs, 1, -1); err != nil { return nil, err }
 		action, ok := args[0].(*FileActionValue)
 		if !ok || action == nil || action.action == nil {
-			return nil, fmt.Errorf("State.File: got %s, want llb.file_action", valueType(args[0]))
+			return nil, fmt.Errorf("state.file: got %s, want llb.file_action", valueType(args[0]))
 		}
-		options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 1, "ConstraintsOpt")
+		options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 1, "constraints_opt")
 		if err != nil { return nil, err }
 		return WrapState(v.state.File(action.action, options...)), nil
 	}), true, nil
 }
 
-var stateFileAttrNames = []string{"File", "file"}
+var stateFileAttrNames = []string{"file", "file"}
 
 func fileOpBuiltins() map[string]starlark.Value {
 	members := make(map[string]starlark.Value)
@@ -220,32 +218,32 @@ func fileOpBuiltins() map[string]starlark.Value {
 			members[name] = value
 		}
 	}
-	members["NewFileOp"] = builtin("NewFileOp", newFileOpBuiltin)
+	members["new_file_op"] = builtin("new_file_op", newFileOpBuiltin)
 	return members
 }
 
 func fileActionBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"Mkdir": builtin("Mkdir", mkdirBuiltin),
-		"Mkfile": builtin("Mkfile", mkfileBuiltin),
-		"Symlink": builtin("Symlink", symlinkBuiltin),
-		"Rm": builtin("Rm", rmBuiltin),
-		"Copy": builtin("Copy", copyBuiltin),
+		"mkdir": builtin("mkdir", mkdirBuiltin),
+		"mkfile": builtin("mkfile", mkfileBuiltin),
+		"symlink": builtin("symlink", symlinkBuiltin),
+		"rm": builtin("rm", rmBuiltin),
+		"copy": builtin("copy", copyBuiltin),
 	}
 }
 
 func fileOwnershipBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"WithParents": boolOptionBuiltin("WithParents", "MkdirOption", buildkitllb.WithParents),
-		"WithUser": stringOptionBuiltin("WithUser", "ChownOption", buildkitllb.WithUser),
-		"WithUIDGID": builtin("WithUIDGID", withUIDGIDBuiltin),
-		"Chmod": builtin("Chmod", chmodBuiltin),
-		"Chown": builtin("Chown", chownBuiltin),
-		"Filename": stringOptionBuiltin("Filename", "FileInfoOption", buildkitllb.Filename),
-		"ChmodMode": intOptionBuiltin("ChmodMode", "CopyOption", func(mode int) buildkitllb.CopyOption {
+		"with_parents": boolOptionBuiltin("with_parents", "mkdir_option", buildkitllb.WithParents),
+		"with_user": stringOptionBuiltin("with_user", "chown_option", buildkitllb.WithUser),
+		"with_uid_gid": builtin("with_uid_gid", withUIDGIDBuiltin),
+		"chmod": builtin("chmod", chmodBuiltin),
+		"chown": builtin("chown", chownBuiltin),
+		"filename": stringOptionBuiltin("filename", "file_info_option", buildkitllb.Filename),
+		"chmod_mode": intOptionBuiltin("chmod_mode", "copy_option", func(mode int) buildkitllb.CopyOption {
 			return buildkitllb.ChmodOpt{Mode: os.FileMode(mode)}
 		}),
-		"ChmodSymbolic": stringOptionBuiltin("ChmodSymbolic", "CopyOption", func(mode string) buildkitllb.CopyOption {
+		"chmod_symbolic": stringOptionBuiltin("chmod_symbolic", "copy_option", func(mode string) buildkitllb.CopyOption {
 			return buildkitllb.ChmodOpt{ModeStr: mode}
 		}),
 	}
@@ -253,15 +251,15 @@ func fileOwnershipBuiltins() map[string]starlark.Value {
 
 func removeOptionBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"WithAllowNotFound": boolOptionBuiltin("WithAllowNotFound", "RmOption", buildkitllb.WithAllowNotFound),
-		"WithAllowWildcard": boolOptionBuiltin("WithAllowWildcard", "RmOption", buildkitllb.WithAllowWildcard),
+		"with_allow_not_found": boolOptionBuiltin("with_allow_not_found", "rm_option", buildkitllb.WithAllowNotFound),
+		"with_allow_wildcard": boolOptionBuiltin("with_allow_wildcard", "rm_option", buildkitllb.WithAllowWildcard),
 	}
 }
 
 func copyOptionBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"WithExcludePatterns": optionBuiltin("WithExcludePatterns", "CopyOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("WithExcludePatterns", args, kwargs, 1, 1); err != nil { return nil, err }
+		"with_exclude_patterns": optionBuiltin("with_exclude_patterns", "copy_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("with_exclude_patterns", args, kwargs, 1, 1); err != nil { return nil, err }
 			patterns, err := stringList(args[0]); if err != nil { return nil, err }
 			return buildkitllb.WithExcludePatterns(patterns), nil
 		}),
@@ -270,87 +268,87 @@ func copyOptionBuiltins() map[string]starlark.Value {
 
 func createdTimeBuiltins() map[string]starlark.Value {
 	create := func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-		if err := arity("WithCreatedTime", args, kwargs, 1, 1); err != nil { return nil, err }
-		raw, err := stringAt("WithCreatedTime", args, 0); if err != nil { return nil, err }
+		if err := arity("with_created_time", args, kwargs, 1, 1); err != nil { return nil, err }
+		raw, err := stringAt("with_created_time", args, 0); if err != nil { return nil, err }
 		created, err := time.Parse(time.RFC3339Nano, raw)
-		if err != nil { return nil, fmt.Errorf("WithCreatedTime: %w", err) }
+		if err != nil { return nil, fmt.Errorf("with_created_time: %w", err) }
 		return buildkitllb.WithCreatedTime(created), nil
 	}
-	value := optionBuiltin("WithCreatedTime", "CreatedTime", create)
-	return map[string]starlark.Value{"CreatedTime": value, "WithCreatedTime": value}
+	value := optionBuiltin("with_created_time", "created_time", create)
+	return map[string]starlark.Value{"created_time": value, "with_created_time": value}
 }
 
 func mkdirBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Mkdir", args, kwargs, 2, -1); err != nil { return nil, err }
-	path, err := stringAt("Mkdir", args, 0); if err != nil { return nil, err }
-	mode, err := intAt("Mkdir", args, 1); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.MkdirOption](args, 2, "MkdirOption")
+	if err := arity("mkdir", args, kwargs, 2, -1); err != nil { return nil, err }
+	path, err := stringAt("mkdir", args, 0); if err != nil { return nil, err }
+	mode, err := intAt("mkdir", args, 1); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.MkdirOption](args, 2, "mkdir_option")
 	if err != nil { return nil, err }
 	return WrapFileAction(buildkitllb.Mkdir(path, os.FileMode(mode), options...)), nil
 }
 
 func mkfileBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Mkfile", args, kwargs, 3, -1); err != nil { return nil, err }
-	path, err := stringAt("Mkfile", args, 0); if err != nil { return nil, err }
-	mode, err := intAt("Mkfile", args, 1); if err != nil { return nil, err }
-	data, err := bytesAt("Mkfile", args, 2); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.MkfileOption](args, 3, "MkfileOption")
+	if err := arity("mkfile", args, kwargs, 3, -1); err != nil { return nil, err }
+	path, err := stringAt("mkfile", args, 0); if err != nil { return nil, err }
+	mode, err := intAt("mkfile", args, 1); if err != nil { return nil, err }
+	data, err := bytesAt("mkfile", args, 2); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.MkfileOption](args, 3, "mkfile_option")
 	if err != nil { return nil, err }
 	return WrapFileAction(buildkitllb.Mkfile(path, os.FileMode(mode), data, options...)), nil
 }
 
 func symlinkBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Symlink", args, kwargs, 2, -1); err != nil { return nil, err }
-	oldPath, err := stringAt("Symlink", args, 0); if err != nil { return nil, err }
-	newPath, err := stringAt("Symlink", args, 1); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.SymlinkOption](args, 2, "SymlinkOption")
+	if err := arity("symlink", args, kwargs, 2, -1); err != nil { return nil, err }
+	oldPath, err := stringAt("symlink", args, 0); if err != nil { return nil, err }
+	newPath, err := stringAt("symlink", args, 1); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.SymlinkOption](args, 2, "symlink_option")
 	if err != nil { return nil, err }
 	return WrapFileAction(buildkitllb.Symlink(oldPath, newPath, options...)), nil
 }
 
 func rmBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Rm", args, kwargs, 1, -1); err != nil { return nil, err }
-	path, err := stringAt("Rm", args, 0); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.RmOption](args, 1, "RmOption")
+	if err := arity("rm", args, kwargs, 1, -1); err != nil { return nil, err }
+	path, err := stringAt("rm", args, 0); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.RmOption](args, 1, "rm_option")
 	if err != nil { return nil, err }
 	return WrapFileAction(buildkitllb.Rm(path, options...)), nil
 }
 
 func copyBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Copy", args, kwargs, 3, -1); err != nil { return nil, err }
+	if err := arity("copy", args, kwargs, 3, -1); err != nil { return nil, err }
 	input, err := copyInputFromValue(args[0]); if err != nil { return nil, err }
-	src, err := stringAt("Copy", args, 1); if err != nil { return nil, err }
-	dest, err := stringAt("Copy", args, 2); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.CopyOption](args, 3, "CopyOption")
+	src, err := stringAt("copy", args, 1); if err != nil { return nil, err }
+	dest, err := stringAt("copy", args, 2); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.CopyOption](args, 3, "copy_option")
 	if err != nil { return nil, err }
 	return WrapFileAction(buildkitllb.Copy(input, src, dest, options...)), nil
 }
 
 func withUIDGIDBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("WithUIDGID", args, kwargs, 2, 2); err != nil { return nil, err }
-	uid, err := intAt("WithUIDGID", args, 0); if err != nil { return nil, err }
-	gid, err := intAt("WithUIDGID", args, 1); if err != nil { return nil, err }
-	return wrapOption("ChownOption", buildkitllb.WithUIDGID(uid, gid)), nil
+	if err := arity("with_uid_gid", args, kwargs, 2, 2); err != nil { return nil, err }
+	uid, err := intAt("with_uid_gid", args, 0); if err != nil { return nil, err }
+	gid, err := intAt("with_uid_gid", args, 1); if err != nil { return nil, err }
+	return wrapOption("chown_option", buildkitllb.WithUIDGID(uid, gid)), nil
 }
 
 func chmodBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Chmod", args, kwargs, 1, 1); err != nil { return nil, err }
-	mode, err := intAt("Chmod", args, 0); if err != nil { return nil, err }
-	return wrapOption("FileInfoOption", buildkitllb.Chmod(os.FileMode(mode))), nil
+	if err := arity("chmod", args, kwargs, 1, 1); err != nil { return nil, err }
+	mode, err := intAt("chmod", args, 0); if err != nil { return nil, err }
+	return wrapOption("file_info_option", buildkitllb.Chmod(os.FileMode(mode))), nil
 }
 
 func chownBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Chown", args, kwargs, 2, 2); err != nil { return nil, err }
-	uid, err := intAt("Chown", args, 0); if err != nil { return nil, err }
-	gid, err := intAt("Chown", args, 1); if err != nil { return nil, err }
-	return wrapOption("FileInfoOption", buildkitllb.Chown(uid, gid)), nil
+	if err := arity("chown", args, kwargs, 2, 2); err != nil { return nil, err }
+	uid, err := intAt("chown", args, 0); if err != nil { return nil, err }
+	gid, err := intAt("chown", args, 1); if err != nil { return nil, err }
+	return wrapOption("file_info_option", buildkitllb.Chown(uid, gid)), nil
 }
 
 func newFileOpBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("NewFileOp", args, kwargs, 2, -1); err != nil { return nil, err }
+	if err := arity("new_file_op", args, kwargs, 2, -1); err != nil { return nil, err }
 	state, err := stateFromValue(args[0]); if err != nil { return nil, err }
 	action, ok := args[1].(*FileActionValue)
-	if !ok || action == nil || action.action == nil { return nil, fmt.Errorf("NewFileOp: got %s, want llb.file_action", valueType(args[1])) }
+	if !ok || action == nil || action.action == nil { return nil, fmt.Errorf("new_file_op: got %s, want llb.file_action", valueType(args[1])) }
 	constraints, err := constraintsFromArgs(args[2:len(args)], 0)
 	if err != nil { return nil, err }
 	return WrapFileOp(buildkitllb.NewFileOp(state, action.action, *constraints)), nil

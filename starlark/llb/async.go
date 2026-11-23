@@ -9,19 +9,19 @@ import (
 	"go.starlark.net/starlark"
 )
 
-// State.Async defers part of an LLB graph until BuildKit resolves the state.
+// state.async defers part of an LLB graph until BuildKit resolves the state.
 // The Starlark callback receives the previous state and the resolution
-// constraints, and must return an llb.State.
+// constraints, and must return an llb.state.
 func stateAsyncAttr(v *StateValue, name string) (starlark.Value, bool, error) {
 	switch name {
-	case "Async", "async":
-		return boundBuiltin("State.Async", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.Async", args, kwargs, 1, 1); err != nil {
+	case "async":
+		return boundBuiltin("state.async", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.async", args, kwargs, 1, 1); err != nil {
 				return nil, err
 			}
 			callback, ok := args[0].(starlark.Callable)
 			if !ok {
-				return nil, fmt.Errorf("State.Async: got %s, want callable", valueType(args[0]))
+				return nil, fmt.Errorf("state.async: got %s, want callable", valueType(args[0]))
 			}
 
 			// BuildKit may resolve an asynchronous vertex while marshaling. A
@@ -46,7 +46,7 @@ func stateAsyncAttr(v *StateValue, name string) (starlark.Value, bool, error) {
 				}
 				state, err := stateFromValue(result)
 				if err != nil {
-					return buildkitllb.State{}, fmt.Errorf("State.Async callback: %w", err)
+					return buildkitllb.State{}, fmt.Errorf("state.async callback: %w", err)
 				}
 				return state, nil
 			})
@@ -57,4 +57,4 @@ func stateAsyncAttr(v *StateValue, name string) (starlark.Value, bool, error) {
 	}
 }
 
-var stateAsyncAttrNames = []string{"Async", "async"}
+var stateAsyncAttrNames = []string{"async", "async"}

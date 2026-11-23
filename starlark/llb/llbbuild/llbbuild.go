@@ -24,17 +24,16 @@ func (v *buildInfoValue) Freeze(){}
 func (v *buildInfoValue) Truth()starlark.Bool{return starlark.Bool(v!=nil&&v.info!=nil)}
 func (v *buildInfoValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llbbuild.build_info")}
 func (v *buildInfoValue) Attr(name string)(starlark.Value,error){
-	name = starlarkllb.SnakeCaseIdentifier(name)
 	if v==nil||v.info==nil{return nil,fmt.Errorf("llbbuild.build_info: nil receiver")}
 	switch name{
-	case "definition_filename","DefinitionFilename":
+	case "definition_filename":
 		return starlark.String(v.info.DefinitionFilename),nil
-	case "constraints","Constraints":
+	case "constraints":
 		return starlarkllb.WrapConstraints(v.info.Constraints),nil
 	default:return nil,nil
 	}
 }
-func (v *buildInfoValue) AttrNames()[]string{return starlarkllb.SnakeCaseNames([]string{"definition_filename","constraints","DefinitionFilename","Constraints"})}
+func (v *buildInfoValue) AttrNames()[]string{return starlarkllb.SnakeCaseNames([]string{"definition_filename","constraints","definition_filename","constraints"})}
 
 // Members returns this subpackage's Starlark globals. Centralized
 // construction, freezing and registration are owned by starlark/modules.
@@ -50,17 +49,17 @@ func Members() starlark.StringDict {
 
 func buildInfoBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var filename string
-	if err:=starlarkllb.UnpackArgs("BuildInfo",args,kwargs,"definition_filename?",&filename);err!=nil{return nil,err}
+	if err:=starlarkllb.UnpackArgs("build_info",args,kwargs,"definition_filename?",&filename);err!=nil{return nil,err}
 	return &buildInfoValue{info:&buildkitllbbuild.BuildInfo{DefinitionFilename:filename}},nil
 }
 func withFilenameBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var filename string
-	if err:=starlarkllb.UnpackArgs("WithFilename",args,kwargs,"filename",&filename);err!=nil{return nil,err}
+	if err:=starlarkllb.UnpackArgs("with_filename",args,kwargs,"filename",&filename);err!=nil{return nil,err}
 	return &buildOptionValue{option:buildkitllbbuild.WithFilename(filename)},nil
 }
 func withConstraintsBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	if len(kwargs)!=0||len(args)!=1{return nil,fmt.Errorf("WithConstraints: expected one llb.constraints_opt")}
-	option,err:=starlarkllbOption(args[0],"ConstraintsOpt")
+	if len(kwargs)!=0||len(args)!=1{return nil,fmt.Errorf("with_constraints: expected one llb.constraints_opt")}
+	option,err:=starlarkllbOption(args[0],"constraints_opt")
 	if err!=nil{return nil,err}
 	return &buildOptionValue{option:buildkitllbbuild.WithConstraints(option)},nil
 }
@@ -72,13 +71,13 @@ func buildBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwa
 	return starlarkllb.WrapOption(buildkitllbbuild.Build(options...)),nil
 }
 func newBuildOpBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	if len(args)<1{return nil,fmt.Errorf("NewBuildOp: missing source output")}
+	if len(args)<1{return nil,fmt.Errorf("new_build_op: missing source output")}
 	source,err:=outputFromStarlark(args[0]);if err!=nil{return nil,err}
 	options,err:=buildOptions(args[1:],kwargs);if err!=nil{return nil,err}
 	return starlarkllb.WrapVertex(buildkitllbbuild.NewBuildOp(source,options...)),nil
 }
 func buildOptions(args starlark.Tuple,kwargs []starlark.Tuple)([]buildkitllbbuild.BuildOption,error){
-	if len(kwargs)!=0{return nil,fmt.Errorf("llbbuild: use BuildOption values positionally")}
+	if len(kwargs)!=0{return nil,fmt.Errorf("llbbuild: use build_option values positionally")}
 	options:=make([]buildkitllbbuild.BuildOption,len(args))
 	for i,arg:=range args{
 		value,ok:=arg.(*buildOptionValue)
@@ -94,5 +93,5 @@ func outputFromStarlark(value starlark.Value)(buildkitllb.Output,error){
 	case *starlarkllb.OutputValue:
 		if v!=nil{return v.Unwrap(),nil}
 	}
-	return nil,fmt.Errorf("NewBuildOp: got %s, want llb.state or llb.output",value.Type())
+	return nil,fmt.Errorf("new_build_op: got %s, want llb.state or llb.output",value.Type())
 }

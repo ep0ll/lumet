@@ -19,29 +19,28 @@ func (v *MergeOpValue) Freeze(){}
 func (v *MergeOpValue) Truth()starlark.Bool{return starlark.Bool(v!=nil&&v.op!=nil)}
 func (v *MergeOpValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llb.merge_op")}
 func (v *MergeOpValue) Attr(name string)(starlark.Value,error){
-	name = SnakeCaseIdentifier(name)
-	if v==nil||v.op==nil{return nil,fmt.Errorf("llb.merge_op: nil receiver")}
+		if v==nil||v.op==nil{return nil,fmt.Errorf("llb.merge_op: nil receiver")}
 	switch name{
-	case "Output","output":
-		return boundBuiltin("MergeOp.Output",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("MergeOp.Output",args,kwargs,0,0);err!=nil{return nil,err}
+	case "output":
+		return boundBuiltin("merge_op.output",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("merge_op.output",args,kwargs,0,0);err!=nil{return nil,err}
 			output:=v.op.Output();if output==nil{return starlark.None,nil};return WrapOutput(output),nil
 		}),nil
-	case "Inputs","inputs":
-		return boundBuiltin("MergeOp.Inputs",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("MergeOp.Inputs",args,kwargs,0,0);err!=nil{return nil,err}
+	case "inputs":
+		return boundBuiltin("merge_op.inputs",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("merge_op.inputs",args,kwargs,0,0);err!=nil{return nil,err}
 			return outputListValue(v.op.Inputs()),nil
 		}),nil
-	case "Validate","validate":
-		return boundBuiltin("MergeOp.Validate",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("MergeOp.Validate",args,kwargs,0,-1);err!=nil{return nil,err}
+	case "validate":
+		return boundBuiltin("merge_op.validate",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("merge_op.validate",args,kwargs,0,-1);err!=nil{return nil,err}
 			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
 			if err:=v.op.Validate(callContext(thread),constraints);err!=nil{return nil,err}
 			return starlark.None,nil
 		}),nil
-	case "Marshal","marshal":
-		return boundBuiltin("MergeOp.Marshal",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("MergeOp.Marshal",args,kwargs,0,-1);err!=nil{return nil,err}
+	case "marshal":
+		return boundBuiltin("merge_op.marshal",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("merge_op.marshal",args,kwargs,0,-1);err!=nil{return nil,err}
 			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
 			dgst,data,metadata,sources,err:=v.op.Marshal(callContext(thread),constraints);if err!=nil{return nil,err}
 			return marshalResult(dgst,data,metadata,sources),nil
@@ -49,31 +48,31 @@ func (v *MergeOpValue) Attr(name string)(starlark.Value,error){
 	default:return nil,nil
 	}
 }
-func (v *MergeOpValue) AttrNames()[]string{return SnakeCaseNames([]string{"Output","Inputs","Validate","Marshal","output","inputs","validate","marshal"})}
+func (v *MergeOpValue) AttrNames()[]string{return SnakeCaseNames([]string{"output","inputs","validate","marshal","output","inputs","validate","marshal"})}
 
 func mergeBuiltins()map[string]starlark.Value{
 	return map[string]starlark.Value{
-		"Merge":builtin("Merge",mergeBuiltin),
-		"NewMerge":builtin("NewMerge",newMergeBuiltin),
+		"merge":builtin("merge",mergeBuiltin),
+		"new_merge":builtin("new_merge",newMergeBuiltin),
 	}
 }
 func mergeBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	if err:=arity("Merge",args,kwargs,1,-1);err!=nil{return nil,err}
-	list,ok:=args[0].(starlark.Indexable);if !ok{return nil,fmt.Errorf("Merge: first argument must be a list or tuple of llb.state")}
+	if err:=arity("merge",args,kwargs,1,-1);err!=nil{return nil,err}
+	list,ok:=args[0].(starlark.Indexable);if !ok{return nil,fmt.Errorf("merge: first argument must be a list or tuple of llb.state")}
 	states:=make([]buildkitllb.State,list.Len())
 	for i:=range states{
-		state,err:=stateFromValue(list.Index(i));if err!=nil{return nil,fmt.Errorf("Merge: state %d: %w",i,err)}
+		state,err:=stateFromValue(list.Index(i));if err!=nil{return nil,fmt.Errorf("merge: state %d: %w",i,err)}
 		states[i]=state
 	}
-	options,err:=optionsFromArgs[buildkitllb.ConstraintsOpt](args,1,"ConstraintsOpt");if err!=nil{return nil,err}
+	options,err:=optionsFromArgs[buildkitllb.ConstraintsOpt](args,1,"constraints_opt");if err!=nil{return nil,err}
 	return WrapState(buildkitllb.Merge(states,options...)),nil
 }
 func newMergeBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	if err:=arity("NewMerge",args,kwargs,2,2);err!=nil{return nil,err}
-	list,ok:=args[0].(starlark.Indexable);if !ok{return nil,fmt.Errorf("NewMerge: first argument must be a list or tuple")}
+	if err:=arity("new_merge",args,kwargs,2,2);err!=nil{return nil,err}
+	list,ok:=args[0].(starlark.Indexable);if !ok{return nil,fmt.Errorf("new_merge: first argument must be a list or tuple")}
 	states:=make([]buildkitllb.State,list.Len())
-	for i:=range states{state,err:=stateFromValue(list.Index(i));if err!=nil{return nil,fmt.Errorf("NewMerge: state %d: %w",i,err)};states[i]=state}
-	constraints,ok:=args[1].(*ConstraintsValue);if !ok||constraints==nil{return nil,fmt.Errorf("NewMerge: second argument must be llb.constraints")}
+	for i:=range states{state,err:=stateFromValue(list.Index(i));if err!=nil{return nil,fmt.Errorf("new_merge: state %d: %w",i,err)};states[i]=state}
+	constraints,ok:=args[1].(*ConstraintsValue);if !ok||constraints==nil{return nil,fmt.Errorf("new_merge: second argument must be llb.constraints")}
 	return WrapMergeOp(buildkitllb.NewMerge(states,constraints.Unwrap())),nil
 }
 

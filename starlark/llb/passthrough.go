@@ -22,15 +22,14 @@ func (v *PassthroughInputValue) Freeze(){}
 func (v *PassthroughInputValue) Truth()starlark.Bool{return starlark.Bool(v!=nil)}
 func (v *PassthroughInputValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llb.passthrough_input")}
 func (v *PassthroughInputValue) Attr(name string)(starlark.Value,error){
-	name = SnakeCaseIdentifier(name)
-	if v==nil{return nil,fmt.Errorf("llb.passthrough_input: nil receiver")}
+		if v==nil{return nil,fmt.Errorf("llb.passthrough_input: nil receiver")}
 	switch name{
-	case "state","State":return WrapState(v.input.State),nil
-	case "output","Output":return starlark.Bool(v.input.Output),nil
+	case "state":return WrapState(v.input.State),nil
+	case "output":return starlark.Bool(v.input.Output),nil
 	default:return nil,nil
 	}
 }
-func (v *PassthroughInputValue) AttrNames()[]string{return SnakeCaseNames([]string{"state","output","State","Output"})}
+func (v *PassthroughInputValue) AttrNames()[]string{return SnakeCaseNames([]string{"state","output","state","output"})}
 
 // PassthroughOpValue wraps a multi-output passthrough vertex.
 type PassthroughOpValue struct { op *buildkitllb.PassthroughOp }
@@ -44,35 +43,34 @@ func (v *PassthroughOpValue) Freeze(){}
 func (v *PassthroughOpValue) Truth()starlark.Bool{return starlark.Bool(v!=nil&&v.op!=nil)}
 func (v *PassthroughOpValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llb.passthrough_op")}
 func (v *PassthroughOpValue) Attr(name string)(starlark.Value,error){
-	name = SnakeCaseIdentifier(name)
-	if v==nil||v.op==nil{return nil,fmt.Errorf("llb.passthrough_op: nil receiver")}
+		if v==nil||v.op==nil{return nil,fmt.Errorf("llb.passthrough_op: nil receiver")}
 	switch name{
-	case "Output","output":
-		return boundBuiltin("PassthroughOp.Output",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("PassthroughOp.Output",args,kwargs,0,0);err!=nil{return nil,err}
+	case "output":
+		return boundBuiltin("passthrough_op.output",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("passthrough_op.output",args,kwargs,0,0);err!=nil{return nil,err}
 			return WrapOutput(v.op.Output()),nil
 		}),nil
-	case "OutputAt","output_at":
-		return boundBuiltin("PassthroughOp.OutputAt",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("PassthroughOp.OutputAt",args,kwargs,1,1);err!=nil{return nil,err}
-			index,err:=intAt("PassthroughOp.OutputAt",args,0);if err!=nil{return nil,err}
+	case "output_at":
+		return boundBuiltin("passthrough_op.output_at",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("passthrough_op.output_at",args,kwargs,1,1);err!=nil{return nil,err}
+			index,err:=intAt("passthrough_op.output_at",args,0);if err!=nil{return nil,err}
 			return WrapOutput(v.op.OutputAt(index)),nil
 		}),nil
-	case "Inputs","inputs":
-		return boundBuiltin("PassthroughOp.Inputs",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("PassthroughOp.Inputs",args,kwargs,0,0);err!=nil{return nil,err}
+	case "inputs":
+		return boundBuiltin("passthrough_op.inputs",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("passthrough_op.inputs",args,kwargs,0,0);err!=nil{return nil,err}
 			return outputListValue(v.op.Inputs()),nil
 		}),nil
-	case "Validate","validate":
-		return boundBuiltin("PassthroughOp.Validate",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("PassthroughOp.Validate",args,kwargs,0,-1);err!=nil{return nil,err}
+	case "validate":
+		return boundBuiltin("passthrough_op.validate",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("passthrough_op.validate",args,kwargs,0,-1);err!=nil{return nil,err}
 			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
 			if err:=v.op.Validate(callContext(thread),constraints);err!=nil{return nil,err}
 			return starlark.None,nil
 		}),nil
-	case "Marshal","marshal":
-		return boundBuiltin("PassthroughOp.Marshal",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-			if err:=arity("PassthroughOp.Marshal",args,kwargs,0,-1);err!=nil{return nil,err}
+	case "marshal":
+		return boundBuiltin("passthrough_op.marshal",func(thread *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
+			if err:=arity("passthrough_op.marshal",args,kwargs,0,-1);err!=nil{return nil,err}
 			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
 			dgst,data,metadata,sources,err:=v.op.Marshal(callContext(thread),constraints);if err!=nil{return nil,err}
 			return marshalResult(dgst,data,metadata,sources),nil
@@ -80,20 +78,20 @@ func (v *PassthroughOpValue) Attr(name string)(starlark.Value,error){
 	default:return nil,nil
 	}
 }
-func (v *PassthroughOpValue) AttrNames()[]string{return SnakeCaseNames([]string{"Output","OutputAt","Inputs","Validate","Marshal","output","output_at","inputs","validate","marshal"})}
+func (v *PassthroughOpValue) AttrNames()[]string{return SnakeCaseNames([]string{"output","output_at","inputs","validate","marshal","output","output_at","inputs","validate","marshal"})}
 
 func passthroughBuiltins()map[string]starlark.Value{
 	return map[string]starlark.Value{
-		"PassthroughInput":builtin("PassthroughInput",passthroughInputBuiltin),
-		"NewPassthroughOp":builtin("NewPassthroughOp",newPassthroughOpBuiltin),
-		"NewPassthrough":builtin("NewPassthrough",newPassthroughBuiltin),
-		"Passthrough":builtin("Passthrough",newPassthroughBuiltin),
+		"passthrough_input":builtin("passthrough_input",passthroughInputBuiltin),
+		"new_passthrough_op":builtin("new_passthrough_op",newPassthroughOpBuiltin),
+		"new_passthrough":builtin("new_passthrough",newPassthroughBuiltin),
+		"passthrough":builtin("passthrough",newPassthroughBuiltin),
 	}
 }
 func passthroughInputBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var stateValue starlark.Value
 	var output bool=true
-	if err:=UnpackArgs("PassthroughInput",args,kwargs,"state",&stateValue,"output?",&output);err!=nil{return nil,err}
+	if err:=UnpackArgs("passthrough_input",args,kwargs,"state",&stateValue,"output?",&output);err!=nil{return nil,err}
 	state,err:=stateFromValue(stateValue);if err!=nil{return nil,err}
 	return WrapPassthroughInput(buildkitllb.PassthroughInput{State:state,Output:output}),nil
 }
@@ -108,17 +106,17 @@ func passthroughInputsFromValue(value starlark.Value)([]buildkitllb.PassthroughI
 	return inputs,nil
 }
 func newPassthroughOpBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	if err:=arity("NewPassthroughOp",args,kwargs,2,-1);err!=nil{return nil,err}
-	id,err:=stringAt("NewPassthroughOp",args,0);if err!=nil{return nil,err}
+	if err:=arity("new_passthrough_op",args,kwargs,2,-1);err!=nil{return nil,err}
+	id,err:=stringAt("new_passthrough_op",args,0);if err!=nil{return nil,err}
 	inputs,err:=passthroughInputsFromValue(args[1]);if err!=nil{return nil,err}
-	options,err:=optionsFromArgs[buildkitllb.ConstraintsOpt](args,2,"ConstraintsOpt");if err!=nil{return nil,err}
+	options,err:=optionsFromArgs[buildkitllb.ConstraintsOpt](args,2,"constraints_opt");if err!=nil{return nil,err}
 	return WrapPassthroughOp(buildkitllb.NewPassthroughOp(id,inputs,options...)),nil
 }
 func newPassthroughBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	if err:=arity("NewPassthrough",args,kwargs,2,-1);err!=nil{return nil,err}
-	id,err:=stringAt("NewPassthrough",args,0);if err!=nil{return nil,err}
+	if err:=arity("new_passthrough",args,kwargs,2,-1);err!=nil{return nil,err}
+	id,err:=stringAt("new_passthrough",args,0);if err!=nil{return nil,err}
 	inputs,err:=passthroughInputsFromValue(args[1]);if err!=nil{return nil,err}
-	options,err:=optionsFromArgs[buildkitllb.ConstraintsOpt](args,2,"ConstraintsOpt");if err!=nil{return nil,err}
+	options,err:=optionsFromArgs[buildkitllb.ConstraintsOpt](args,2,"constraints_opt");if err!=nil{return nil,err}
 	return WrapState(buildkitllb.NewPassthrough(id,inputs,options...)),nil
 }
 

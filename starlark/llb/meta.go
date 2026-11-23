@@ -27,47 +27,46 @@ func (v *EnvListValue) Truth() starlark.Bool  { return starlark.Bool(v != nil &&
 func (v *EnvListValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.env_list") }
 
 func (v *EnvListValue) Attr(name string) (starlark.Value, error) {
-	name = SnakeCaseIdentifier(name)
-	if v == nil || v.env == nil {
+		if v == nil || v.env == nil {
 		return nil, fmt.Errorf("llb.env_list: nil receiver")
 	}
 	switch name {
-	case "AddOrReplace", "add_or_replace":
-		return boundBuiltin("EnvList.AddOrReplace", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("EnvList.AddOrReplace", args, kwargs, 2, 2); err != nil { return nil, err }
-			key, err := stringAt("EnvList.AddOrReplace", args, 0); if err != nil { return nil, err }
-			value, err := stringAt("EnvList.AddOrReplace", args, 1); if err != nil { return nil, err }
+	case "add_or_replace":
+		return boundBuiltin("env_list.add_or_replace", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("env_list.add_or_replace", args, kwargs, 2, 2); err != nil { return nil, err }
+			key, err := stringAt("env_list.add_or_replace", args, 0); if err != nil { return nil, err }
+			value, err := stringAt("env_list.add_or_replace", args, 1); if err != nil { return nil, err }
 			return WrapEnvList(v.env.AddOrReplace(key, value)), nil
 		}), nil
-	case "SetDefault", "set_default":
-		return boundBuiltin("EnvList.SetDefault", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("EnvList.SetDefault", args, kwargs, 2, 2); err != nil { return nil, err }
-			key, err := stringAt("EnvList.SetDefault", args, 0); if err != nil { return nil, err }
-			value, err := stringAt("EnvList.SetDefault", args, 1); if err != nil { return nil, err }
+	case "set_default":
+		return boundBuiltin("env_list.set_default", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("env_list.set_default", args, kwargs, 2, 2); err != nil { return nil, err }
+			key, err := stringAt("env_list.set_default", args, 0); if err != nil { return nil, err }
+			value, err := stringAt("env_list.set_default", args, 1); if err != nil { return nil, err }
 			return WrapEnvList(v.env.SetDefault(key, value)), nil
 		}), nil
-	case "Delete", "delete":
-		return boundBuiltin("EnvList.Delete", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("EnvList.Delete", args, kwargs, 1, 1); err != nil { return nil, err }
-			key, err := stringAt("EnvList.Delete", args, 0); if err != nil { return nil, err }
+	case "delete":
+		return boundBuiltin("env_list.delete", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("env_list.delete", args, kwargs, 1, 1); err != nil { return nil, err }
+			key, err := stringAt("env_list.delete", args, 0); if err != nil { return nil, err }
 			env := v.env.Delete(key)
 			return WrapEnvList(&env), nil
 		}), nil
-	case "Get", "get":
-		return boundBuiltin("EnvList.Get", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("EnvList.Get", args, kwargs, 1, 1); err != nil { return nil, err }
-			key, err := stringAt("EnvList.Get", args, 0); if err != nil { return nil, err }
+	case "get":
+		return boundBuiltin("env_list.get", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("env_list.get", args, kwargs, 1, 1); err != nil { return nil, err }
+			key, err := stringAt("env_list.get", args, 0); if err != nil { return nil, err }
 			value, ok := v.env.Get(key)
 			return starlark.Tuple{starlark.String(value), starlark.Bool(ok)}, nil
 		}), nil
-	case "Keys", "keys":
-		return boundBuiltin("EnvList.Keys", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("EnvList.Keys", args, kwargs, 0, 0); err != nil { return nil, err }
+	case "keys":
+		return boundBuiltin("env_list.keys", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("env_list.keys", args, kwargs, 0, 0); err != nil { return nil, err }
 			return stringSliceValue(v.env.Keys()), nil
 		}), nil
-	case "ToArray", "to_array":
-		return boundBuiltin("EnvList.ToArray", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("EnvList.ToArray", args, kwargs, 0, 0); err != nil { return nil, err }
+	case "to_array":
+		return boundBuiltin("env_list.to_array", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("env_list.to_array", args, kwargs, 0, 0); err != nil { return nil, err }
 			return stringSliceValue(v.env.ToArray()), nil
 		}), nil
 	default:
@@ -76,7 +75,7 @@ func (v *EnvListValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *EnvListValue) AttrNames() []string {
-	return SnakeCaseNames([]string{"AddOrReplace", "Delete", "Get", "Keys", "SetDefault", "ToArray",
+	return SnakeCaseNames([]string{"add_or_replace", "delete", "get", "keys", "set_default", "to_array",
 		"add_or_replace", "delete", "get", "keys", "set_default", "to_array"})
 }
 
@@ -97,19 +96,18 @@ func (v *HostIPValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
 func (v *HostIPValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.host_ip") }
 
 func (v *HostIPValue) Attr(name string) (starlark.Value, error) {
-	name = SnakeCaseIdentifier(name)
-	if v == nil { return nil, fmt.Errorf("llb.host_ip: nil receiver") }
+		if v == nil { return nil, fmt.Errorf("llb.host_ip: nil receiver") }
 	switch name {
-	case "host", "Host":
+	case "host":
 		return starlark.String(v.hostIP.Host), nil
-	case "ip", "IP":
+	case "ip":
 		return starlark.String(v.hostIP.IP.String()), nil
 	default:
 		return nil, nil
 	}
 }
 
-func (v *HostIPValue) AttrNames() []string { return SnakeCaseNames([]string{"host", "ip", "Host", "IP"}) }
+func (v *HostIPValue) AttrNames() []string { return SnakeCaseNames([]string{"host", "ip", "host", "ip"}) }
 
 // LinuxResourcesValue adapts BuildKit's container resource limits.
 type LinuxResourcesValue struct {
@@ -128,22 +126,21 @@ func (v *LinuxResourcesValue) Truth() starlark.Bool  { return starlark.Bool(v !=
 func (v *LinuxResourcesValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.linux_resources") }
 
 func (v *LinuxResourcesValue) Attr(name string) (starlark.Value, error) {
-	name = SnakeCaseIdentifier(name)
-	if v == nil { return nil, fmt.Errorf("llb.linux_resources: nil receiver") }
+		if v == nil { return nil, fmt.Errorf("llb.linux_resources: nil receiver") }
 	switch name {
-	case "memory", "Memory":
+	case "memory":
 		return starlark.MakeInt64(v.resources.Memory), nil
-	case "memory_swap", "MemorySwap":
+	case "memory_swap":
 		return starlark.MakeInt64(v.resources.MemorySwap), nil
-	case "cpu_shares", "CPUShares":
+	case "cpu_shares":
 		return starlark.MakeUint64(v.resources.CPUShares), nil
-	case "cpu_period", "CPUPeriod":
+	case "cpu_period":
 		return starlark.MakeUint64(v.resources.CPUPeriod), nil
-	case "cpu_quota", "CPUQuota":
+	case "cpu_quota":
 		return starlark.MakeInt64(v.resources.CPUQuota), nil
-	case "cpuset_cpus", "CpusetCpus":
+	case "cpuset_cpus":
 		return starlark.String(v.resources.CpusetCpus), nil
-	case "cpuset_mems", "CpusetMems":
+	case "cpuset_mems":
 		return starlark.String(v.resources.CpusetMems), nil
 	default:
 		return nil, nil
@@ -152,175 +149,175 @@ func (v *LinuxResourcesValue) Attr(name string) (starlark.Value, error) {
 
 func (v *LinuxResourcesValue) AttrNames() []string {
 	return SnakeCaseNames([]string{"memory", "memory_swap", "cpu_shares", "cpu_period", "cpu_quota", "cpuset_cpus", "cpuset_mems",
-		"Memory", "MemorySwap", "CPUShares", "CPUPeriod", "CPUQuota", "CpusetCpus", "CpusetMems"})
+		"memory", "memory_swap", "cpu_shares", "cpu_period", "cpu_quota", "cpuset_cpus", "cpuset_mems"})
 }
 
 func (v *StateValue) stateMetaAttr(name string) (starlark.Value, bool, error) {
 	state := v.state
 	switch name {
-	case "AddEnv", "add_env":
-		return stateStringPairMethod("State.AddEnv", state.AddEnv), true, nil
-	case "AddEnvf", "add_envf":
-		return boundBuiltin("State.AddEnvf", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.AddEnvf", args, kwargs, 2, -1); err != nil { return nil, err }
-			key, err := stringAt("State.AddEnvf", args, 0); if err != nil { return nil, err }
-			format, err := stringAt("State.AddEnvf", args, 1); if err != nil { return nil, err }
+	case "add_env":
+		return stateStringPairMethod("state.add_env", state.AddEnv), true, nil
+	case "add_envf":
+		return boundBuiltin("state.add_envf", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.add_envf", args, kwargs, 2, -1); err != nil { return nil, err }
+			key, err := stringAt("state.add_envf", args, 0); if err != nil { return nil, err }
+			format, err := stringAt("state.add_envf", args, 1); if err != nil { return nil, err }
 			values := make([]any, 0, len(args)-2)
 			for _, arg := range args[2:] { values = append(values, goScalar(arg)) }
 			return WrapState(state.AddEnvf(key, format, values...)), nil
 		}), true, nil
-	case "DelEnv", "del_env":
-		return stateStringMethod("State.DelEnv", state.DelEnv), true, nil
-	case "Dir", "dir":
-		return stateStringMethod("State.Dir", state.Dir), true, nil
-	case "Dirf", "dirf":
-		return boundBuiltin("State.Dirf", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.Dirf", args, kwargs, 1, -1); err != nil { return nil, err }
-			format, err := stringAt("State.Dirf", args, 0); if err != nil { return nil, err }
+	case "del_env":
+		return stateStringMethod("state.del_env", state.DelEnv), true, nil
+	case "dir":
+		return stateStringMethod("state.dir", state.Dir), true, nil
+	case "dirf":
+		return boundBuiltin("state.dirf", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.dirf", args, kwargs, 1, -1); err != nil { return nil, err }
+			format, err := stringAt("state.dirf", args, 0); if err != nil { return nil, err }
 			values := make([]any, 0, len(args)-1)
 			for _, arg := range args[1:] { values = append(values, goScalar(arg)) }
 			return WrapState(state.Dirf(format, values...)), nil
 		}), true, nil
-	case "User", "user":
-		return stateStringMethod("State.User", state.User), true, nil
-	case "Hostname", "hostname":
-		return stateStringMethod("State.Hostname", state.Hostname), true, nil
-	case "WithCgroupParent", "with_cgroup_parent":
-		return stateStringMethod("State.WithCgroupParent", state.WithCgroupParent), true, nil
-	case "With", "with":
-		return boundBuiltin("State.With", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.With", args, kwargs, 0, -1); err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.StateOption](args, 0, "StateOption")
+	case "user":
+		return stateStringMethod("state.user", state.User), true, nil
+	case "hostname":
+		return stateStringMethod("state.hostname", state.Hostname), true, nil
+	case "with_cgroup_parent":
+		return stateStringMethod("state.with_cgroup_parent", state.WithCgroupParent), true, nil
+	case "with":
+		return boundBuiltin("state.with", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.with", args, kwargs, 0, -1); err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.StateOption](args, 0, "state_option")
 			if err != nil { return nil, err }
 			return WrapState(state.With(options...)), nil
 		}), true, nil
-	case "Reset", "reset":
-		return boundBuiltin("State.Reset", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.Reset", args, kwargs, 1, 1); err != nil { return nil, err }
+	case "reset":
+		return boundBuiltin("state.reset", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.reset", args, kwargs, 1, 1); err != nil { return nil, err }
 			other, err := stateFromValue(args[0])
 			if err != nil { return nil, err }
 			return WrapState(state.Reset(other)), nil
 		}), true, nil
-	case "Network", "network":
-		return boundBuiltin("State.Network", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.Network", args, kwargs, 1, 1); err != nil { return nil, err }
-			mode, err := intAt("State.Network", args, 0)
+	case "network":
+		return boundBuiltin("state.network", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.network", args, kwargs, 1, 1); err != nil { return nil, err }
+			mode, err := intAt("state.network", args, 0)
 			if err != nil { return nil, err }
 			return WrapState(state.Network(pb.NetMode(mode))), nil
 		}), true, nil
-	case "Security", "security":
-		return boundBuiltin("State.Security", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.Security", args, kwargs, 1, 1); err != nil { return nil, err }
-			mode, err := intAt("State.Security", args, 0)
+	case "security":
+		return boundBuiltin("state.security", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.security", args, kwargs, 1, 1); err != nil { return nil, err }
+			mode, err := intAt("state.security", args, 0)
 			if err != nil { return nil, err }
 			return WrapState(state.Security(pb.SecurityMode(mode))), nil
 		}), true, nil
-	case "Platform", "platform":
-		return boundBuiltin("State.Platform", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.Platform", args, kwargs, 1, 1); err != nil { return nil, err }
+	case "platform":
+		return boundBuiltin("state.platform", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.platform", args, kwargs, 1, 1); err != nil { return nil, err }
 			platform, ok := args[0].(*OCIPlatformValue)
-			if !ok || platform == nil { return nil, fmt.Errorf("State.Platform: got %s, want llb.oci_platform", valueType(args[0])) }
+			if !ok || platform == nil { return nil, fmt.Errorf("state.platform: got %s, want llb.oci_platform", valueType(args[0])) }
 			return WrapState(state.Platform(platform.platform)), nil
 		}), true, nil
-	case "AddExtraHost", "add_extra_host":
-		return boundBuiltin("State.AddExtraHost", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.AddExtraHost", args, kwargs, 2, 2); err != nil { return nil, err }
-			host, err := stringAt("State.AddExtraHost", args, 0); if err != nil { return nil, err }
-			rawIP, err := stringAt("State.AddExtraHost", args, 1); if err != nil { return nil, err }
+	case "add_extra_host":
+		return boundBuiltin("state.add_extra_host", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.add_extra_host", args, kwargs, 2, 2); err != nil { return nil, err }
+			host, err := stringAt("state.add_extra_host", args, 0); if err != nil { return nil, err }
+			rawIP, err := stringAt("state.add_extra_host", args, 1); if err != nil { return nil, err }
 			ip := net.ParseIP(rawIP)
-			if ip == nil { return nil, fmt.Errorf("State.AddExtraHost: invalid IP address %q", rawIP) }
+			if ip == nil { return nil, fmt.Errorf("state.add_extra_host: invalid ip address %q", rawIP) }
 			return WrapState(state.AddExtraHost(host, ip)), nil
 		}), true, nil
-	case "Requires", "requires":
-		return boundBuiltin("State.Requires", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.Requires", args, kwargs, 1, -1); err != nil { return nil, err }
-			id, err := stringAt("State.Requires", args, 0)
+	case "requires":
+		return boundBuiltin("state.requires", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.requires", args, kwargs, 1, -1); err != nil { return nil, err }
+			id, err := stringAt("state.requires", args, 0)
 			if err != nil { return nil, err }
 			dependencies := make([]buildkitllb.State, 0, len(args)-1)
 			for i := 1; i < len(args); i++ {
 				dependency, err := stateFromValue(args[i])
-				if err != nil { return nil, fmt.Errorf("State.Requires dependency %d: %w", i, err) }
+				if err != nil { return nil, fmt.Errorf("state.requires dependency %d: %w", i, err) }
 				dependencies = append(dependencies, dependency)
 			}
 			return WrapState(state.Requires(id, dependencies...)), nil
 		}), true, nil
-	case "AddUlimit", "add_ulimit":
-		return boundBuiltin("State.AddUlimit", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.AddUlimit", args, kwargs, 3, 3); err != nil { return nil, err }
-			name, err := stringAt("State.AddUlimit", args, 0); if err != nil { return nil, err }
-			soft, err := int64At("State.AddUlimit", args, 1); if err != nil { return nil, err }
-			hard, err := int64At("State.AddUlimit", args, 2); if err != nil { return nil, err }
+	case "add_ulimit":
+		return boundBuiltin("state.add_ulimit", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.add_ulimit", args, kwargs, 3, 3); err != nil { return nil, err }
+			name, err := stringAt("state.add_ulimit", args, 0); if err != nil { return nil, err }
+			soft, err := int64At("state.add_ulimit", args, 1); if err != nil { return nil, err }
+			hard, err := int64At("state.add_ulimit", args, 2); if err != nil { return nil, err }
 			return WrapState(state.AddUlimit(buildkitllb.UlimitName(name), soft, hard)), nil
 		}), true, nil
-	case "GetEnv", "get_env":
-		return boundBuiltin("State.GetEnv", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.GetEnv", args, kwargs, 1, -1); err != nil { return nil, err }
-			key, err := stringAt("State.GetEnv", args, 0); if err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 1, "ConstraintsOpt")
+	case "get_env":
+		return boundBuiltin("state.get_env", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.get_env", args, kwargs, 1, -1); err != nil { return nil, err }
+			key, err := stringAt("state.get_env", args, 0); if err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 1, "constraints_opt")
 			if err != nil { return nil, err }
 			value, ok, err := state.GetEnv(callContext(thread), key, options...)
 			if err != nil { return nil, err }
 			return starlark.Tuple{starlark.String(value), starlark.Bool(ok)}, nil
 		}), true, nil
-	case "Env", "env":
-		return boundBuiltin("State.Env", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.Env", args, kwargs, 0, -1); err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+	case "env":
+		return boundBuiltin("state.env", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.env", args, kwargs, 0, -1); err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "constraints_opt")
 			if err != nil { return nil, err }
 			env, err := state.Env(callContext(thread), options...)
 			if err != nil { return nil, err }
 			return WrapEnvList(env), nil
 		}), true, nil
-	case "GetDir", "get_dir":
-		return boundBuiltin("State.GetDir", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.GetDir", args, kwargs, 0, -1); err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+	case "get_dir":
+		return boundBuiltin("state.get_dir", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.get_dir", args, kwargs, 0, -1); err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "constraints_opt")
 			if err != nil { return nil, err }
 			value, err := state.GetDir(callContext(thread), options...)
 			if err != nil { return nil, err }
 			return starlark.String(value), nil
 		}), true, nil
-	case "GetArgs", "get_args":
-		return boundBuiltin("State.GetArgs", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.GetArgs", args, kwargs, 0, -1); err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+	case "get_args":
+		return boundBuiltin("state.get_args", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.get_args", args, kwargs, 0, -1); err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "constraints_opt")
 			if err != nil { return nil, err }
 			values, err := state.GetArgs(callContext(thread), options...)
 			if err != nil { return nil, err }
 			return stringSliceValue(values), nil
 		}), true, nil
-	case "GetHostname", "get_hostname":
-		return boundBuiltin("State.GetHostname", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.GetHostname", args, kwargs, 0, -1); err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+	case "get_hostname":
+		return boundBuiltin("state.get_hostname", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.get_hostname", args, kwargs, 0, -1); err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "constraints_opt")
 			if err != nil { return nil, err }
 			value, err := state.GetHostname(callContext(thread), options...)
 			if err != nil { return nil, err }
 			return starlark.String(value), nil
 		}), true, nil
-	case "GetPlatform", "get_platform":
-		return boundBuiltin("State.GetPlatform", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.GetPlatform", args, kwargs, 0, -1); err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+	case "get_platform":
+		return boundBuiltin("state.get_platform", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.get_platform", args, kwargs, 0, -1); err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "constraints_opt")
 			if err != nil { return nil, err }
 			value, err := state.GetPlatform(callContext(thread), options...)
 			if err != nil { return nil, err }
 			if value == nil { return starlark.None, nil }
 			return WrapOCIPlatform(*value), nil
 		}), true, nil
-	case "GetNetwork", "get_network":
-		return boundBuiltin("State.GetNetwork", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.GetNetwork", args, kwargs, 0, -1); err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+	case "get_network":
+		return boundBuiltin("state.get_network", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.get_network", args, kwargs, 0, -1); err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "constraints_opt")
 			if err != nil { return nil, err }
 			value, err := state.GetNetwork(callContext(thread), options...)
 			if err != nil { return nil, err }
 			return starlark.MakeInt(int(value)), nil
 		}), true, nil
-	case "GetSecurity", "get_security":
-		return boundBuiltin("State.GetSecurity", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("State.GetSecurity", args, kwargs, 0, -1); err != nil { return nil, err }
-			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+	case "get_security":
+		return boundBuiltin("state.get_security", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("state.get_security", args, kwargs, 0, -1); err != nil { return nil, err }
+			options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "constraints_opt")
 			if err != nil { return nil, err }
 			value, err := state.GetSecurity(callContext(thread), options...)
 			if err != nil { return nil, err }
@@ -332,9 +329,9 @@ func (v *StateValue) stateMetaAttr(name string) (starlark.Value, bool, error) {
 }
 
 var stateMetaAttrNames = []string{
-	"AddEnv", "AddEnvf", "AddExtraHost", "AddUlimit", "DelEnv", "Dir", "Dirf",
-	"Env", "GetArgs", "GetDir", "GetEnv", "GetHostname", "GetNetwork", "GetPlatform", "GetSecurity",
-	"Hostname", "Network", "Platform", "Reset", "Requires", "Security", "User", "With", "WithCgroupParent",
+	"add_env", "add_envf", "add_extra_host", "add_ulimit", "del_env", "dir", "dirf",
+	"env", "get_args", "get_dir", "get_env", "get_hostname", "get_network", "get_platform", "get_security",
+	"hostname", "network", "platform", "reset", "requires", "security", "user", "with", "with_cgroup_parent",
 	"add_env", "add_envf", "add_extra_host", "add_ulimit", "del_env", "dir", "dirf", "env",
 	"get_args", "get_dir", "get_env", "get_hostname", "get_network", "get_platform", "get_security",
 	"hostname", "network", "platform", "reset", "requires", "security", "user", "with", "with_cgroup_parent",
@@ -346,74 +343,74 @@ func stateMetaAttr(v *StateValue, name string) (starlark.Value, bool, error) {
 
 func metaBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"AddEnv": optionBuiltin("AddEnv", "StateOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("AddEnv", args, kwargs, 2, 2); err != nil { return nil, err }
-			key, err := stringAt("AddEnv", args, 0); if err != nil { return nil, err }
-			value, err := stringAt("AddEnv", args, 1); if err != nil { return nil, err }
+		"add_env": optionBuiltin("add_env", "state_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("add_env", args, kwargs, 2, 2); err != nil { return nil, err }
+			key, err := stringAt("add_env", args, 0); if err != nil { return nil, err }
+			value, err := stringAt("add_env", args, 1); if err != nil { return nil, err }
 			return buildkitllb.AddEnv(key, value), nil
 		}),
-		"AddEnvf": optionBuiltin("AddEnvf", "StateOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("AddEnvf", args, kwargs, 2, -1); err != nil { return nil, err }
-			key, err := stringAt("AddEnvf", args, 0); if err != nil { return nil, err }
-			format, err := stringAt("AddEnvf", args, 1); if err != nil { return nil, err }
+		"add_envf": optionBuiltin("add_envf", "state_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("add_envf", args, kwargs, 2, -1); err != nil { return nil, err }
+			key, err := stringAt("add_envf", args, 0); if err != nil { return nil, err }
+			format, err := stringAt("add_envf", args, 1); if err != nil { return nil, err }
 			values := make([]any, 0, len(args)-2)
 			for _, arg := range args[2:] { values = append(values, goScalar(arg)) }
 			return buildkitllb.AddEnvf(key, format, values...), nil
 		}),
-		"DelEnv": optionBuiltin("DelEnv", "StateOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("DelEnv", args, kwargs, 1, 1); err != nil { return nil, err }
-			key, err := stringAt("DelEnv", args, 0); if err != nil { return nil, err }
+		"del_env": optionBuiltin("del_env", "state_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("del_env", args, kwargs, 1, 1); err != nil { return nil, err }
+			key, err := stringAt("del_env", args, 0); if err != nil { return nil, err }
 			return buildkitllb.DelEnv(key), nil
 		}),
-		"Dir": optionBuiltin("Dir", "StateOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("Dir", args, kwargs, 1, 1); err != nil { return nil, err }
-			dir, err := stringAt("Dir", args, 0); if err != nil { return nil, err }
+		"dir": optionBuiltin("dir", "state_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("dir", args, kwargs, 1, 1); err != nil { return nil, err }
+			dir, err := stringAt("dir", args, 0); if err != nil { return nil, err }
 			return buildkitllb.Dir(dir), nil
 		}),
-		"Dirf": optionBuiltin("Dirf", "StateOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("Dirf", args, kwargs, 1, -1); err != nil { return nil, err }
-			format, err := stringAt("Dirf", args, 0); if err != nil { return nil, err }
+		"dirf": optionBuiltin("dirf", "state_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("dirf", args, kwargs, 1, -1); err != nil { return nil, err }
+			format, err := stringAt("dirf", args, 0); if err != nil { return nil, err }
 			values := make([]any, 0, len(args)-1)
 			for _, arg := range args[1:] { values = append(values, goScalar(arg)) }
 			return buildkitllb.Dirf(format, values...), nil
 		}),
-		"User": optionBuiltin("User", "StateOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("User", args, kwargs, 1, 1); err != nil { return nil, err }
-			user, err := stringAt("User", args, 0); if err != nil { return nil, err }
+		"user": optionBuiltin("user", "state_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("user", args, kwargs, 1, 1); err != nil { return nil, err }
+			user, err := stringAt("user", args, 0); if err != nil { return nil, err }
 			return buildkitllb.User(user), nil
 		}),
-		"Reset": optionBuiltin("Reset", "StateOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("Reset", args, kwargs, 1, 1); err != nil { return nil, err }
+		"reset": optionBuiltin("reset", "state_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("reset", args, kwargs, 1, 1); err != nil { return nil, err }
 			state, err := stateFromValue(args[0]); if err != nil { return nil, err }
 			return buildkitllb.Reset(state), nil
 		}),
-		"Hostname": optionBuiltin("Hostname", "StateOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("Hostname", args, kwargs, 1, 1); err != nil { return nil, err }
-			hostname, err := stringAt("Hostname", args, 0); if err != nil { return nil, err }
+		"hostname": optionBuiltin("hostname", "state_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("hostname", args, kwargs, 1, 1); err != nil { return nil, err }
+			hostname, err := stringAt("hostname", args, 0); if err != nil { return nil, err }
 			return buildkitllb.Hostname(hostname), nil
 		}),
-		"Network": optionBuiltin("Network", "StateOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("Network", args, kwargs, 1, 1); err != nil { return nil, err }
-			mode, err := intAt("Network", args, 0); if err != nil { return nil, err }
+		"network": optionBuiltin("network", "state_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("network", args, kwargs, 1, 1); err != nil { return nil, err }
+			mode, err := intAt("network", args, 0); if err != nil { return nil, err }
 			return buildkitllb.Network(pb.NetMode(mode)), nil
 		}),
-		"Security": optionBuiltin("Security", "StateOption", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
-			if err := arity("Security", args, kwargs, 1, 1); err != nil { return nil, err }
-			mode, err := intAt("Security", args, 0); if err != nil { return nil, err }
+		"security": optionBuiltin("security", "state_option", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
+			if err := arity("security", args, kwargs, 1, 1); err != nil { return nil, err }
+			mode, err := intAt("security", args, 0); if err != nil { return nil, err }
 			return buildkitllb.Security(pb.SecurityMode(mode)), nil
 		}),
-		"EnvList": builtin("EnvList", func(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("EnvList", args, kwargs, 0, 0); err != nil { return nil, err }
+		"env_list": builtin("env_list", func(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("env_list", args, kwargs, 0, 0); err != nil { return nil, err }
 			return WrapEnvList(&buildkitllb.EnvList{}), nil
 		}),
-		"LinuxResources": builtin("LinuxResources", linuxResourcesBuiltin),
-		"HostIP": builtin("HostIP", hostIPBuiltin),
+		"linux_resources": builtin("linux_resources", linuxResourcesBuiltin),
+		"host_ip": builtin("host_ip", hostIPBuiltin),
 	}
 }
 
 func linuxResourcesBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var resources buildkitllb.LinuxResources
-	if err := UnpackArgs("LinuxResources", args, kwargs,
+	if err := UnpackArgs("linux_resources", args, kwargs,
 		"memory?", &resources.Memory,
 		"memory_swap?", &resources.MemorySwap,
 		"cpu_shares?", &resources.CPUShares,
@@ -426,26 +423,26 @@ func linuxResourcesBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlar
 }
 
 func hostIPBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("HostIP", args, kwargs, 2, 2); err != nil { return nil, err }
-	host, err := stringAt("HostIP", args, 0); if err != nil { return nil, err }
-	rawIP, err := stringAt("HostIP", args, 1); if err != nil { return nil, err }
+	if err := arity("host_ip", args, kwargs, 2, 2); err != nil { return nil, err }
+	host, err := stringAt("host_ip", args, 0); if err != nil { return nil, err }
+	rawIP, err := stringAt("host_ip", args, 1); if err != nil { return nil, err }
 	ip := net.ParseIP(rawIP)
-	if ip == nil { return nil, fmt.Errorf("HostIP: invalid IP address %q", rawIP) }
+	if ip == nil { return nil, fmt.Errorf("host_ip: invalid ip address %q", rawIP) }
 	return WrapHostIP(buildkitllb.HostIP{Host: host, IP: ip}), nil
 }
 
 func networkModeValues() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"NetModeSandbox": starlark.MakeInt(int(buildkitllb.NetModeSandbox)),
-		"NetModeHost":    starlark.MakeInt(int(buildkitllb.NetModeHost)),
-		"NetModeNone":    starlark.MakeInt(int(buildkitllb.NetModeNone)),
+		"net_mode_sandbox": starlark.MakeInt(int(buildkitllb.NetModeSandbox)),
+		"net_mode_host":    starlark.MakeInt(int(buildkitllb.NetModeHost)),
+		"net_mode_none":    starlark.MakeInt(int(buildkitllb.NetModeNone)),
 	}
 }
 
 func securityModeValues() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"SecurityModeInsecure": starlark.MakeInt(int(buildkitllb.SecurityModeInsecure)),
-		"SecurityModeSandbox":  starlark.MakeInt(int(buildkitllb.SecurityModeSandbox)),
+		"security_mode_insecure": starlark.MakeInt(int(buildkitllb.SecurityModeInsecure)),
+		"security_mode_sandbox":  starlark.MakeInt(int(buildkitllb.SecurityModeSandbox)),
 	}
 }
 
@@ -490,13 +487,13 @@ func stateStringPairMethod(name string, fn func(string, string) buildkitllb.Stat
 
 func newOpMetadataBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if len(kwargs) != 0 || len(args) > 1 {
-		return nil, fmt.Errorf("NewOpMetadata: expected zero or one llb.op_metadata_pb argument")
+		return nil, fmt.Errorf("new_op_metadata: expected zero or one llb.op_metadata_pb argument")
 	}
 	var native *pb.OpMetadata
 	if len(args) == 1 && args[0] != starlark.None {
 		value, ok := args[0].(*OpMetadataProtoValue)
 		if !ok || value == nil {
-			return nil, fmt.Errorf("NewOpMetadata: got %s, want llb.op_metadata_pb or None", valueType(args[0]))
+			return nil, fmt.Errorf("new_op_metadata: got %s, want llb.op_metadata_pb or none", valueType(args[0]))
 		}
 		native = value.metadata
 	}

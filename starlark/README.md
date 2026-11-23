@@ -27,10 +27,13 @@ API work can be reviewed file-by-file against the upstream package.
 | `client/llb/sourceresolver/types.go` | `starlark/llb/sourceresolver/types.go` |
 
 BuildKit's `_test.go` files and `client/llb/llbtest` package are test code
-and test helpers, not production API. They are intentionally not copied into
-the runtime adapter. The additional local files under `starlark/llb`
-(`names.go`, `value.go`, `builtins.go`, and `context.go`) implement the
-Starlark bridge rather than mirror upstream source.
+and test helpers, not production API, so they are intentionally excluded.
+The runtime adapter keeps the same production file layout as BuildKit.
+Small shared Starlark helpers (value wrappers, identifier normalization,
+builtin inventory, and thread-context access) are folded into the existing
+`starlark/llb/state.go` adapter instead of adding non-BuildKit files under
+`starlark/llb`. The only parallel integration package is
+`starlark/modules`, which owns Starlark module registration and execution.
 
 ## Starlark-Go embedding model
 
@@ -63,9 +66,11 @@ registration implementations.
 
 ## Identifier rules
 
-Go-exported identifiers exposed to Starlark are converted to snake_case.
-This includes module globals, callable names, keyword arguments, object
-attributes, `dir()`/attribute listings, and Go-backed value type names.
+Every Starlark-visible identifier is snake_case. This includes module globals,
+builtin names, keyword arguments, object attributes, method names,
+`dir()`/attribute listings, and Go-backed value type names. CamelCase aliases
+are not accepted for attributes or keyword arguments. Go identifiers inside
+the adapter remain idiomatic Go; they are not part of the Starlark surface.
 
 | Go identifier | Starlark name |
 | --- | --- |
@@ -130,9 +135,15 @@ load("llb/sourceresolver.star", "opt", "resolve_image_opt")
 load("llb/sourceresolver", "new_image_meta_resolver")
 
 base = image("alpine:latest")
+root = scratch()
+root = base.run(shlex("apk add --no-cache ca-certificates")).root
+
 resolver_options = opt(
     image = resolve_image_opt(resolve_mode = "force-pull"),
 )
+# State methods use snake_case too:
+# base.async(callback)
+# base.run(...)
 ```
 
 Use `load("llb", ...)` for high-level LLB functions and constants.

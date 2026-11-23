@@ -36,14 +36,14 @@ func Members() starlark.StringDict {
 
 func withDefaultPlatformBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var platformValue starlark.Value=starlark.None
-	if err:=starlarkllb.UnpackArgs("WithDefaultPlatform",args,kwargs,"platform",&platformValue);err!=nil{
+	if err:=starlarkllb.UnpackArgs("with_default_platform",args,kwargs,"platform",&platformValue);err!=nil{
 		return nil,err
 	}
 	var platform *ocispecs.Platform
 	if platformValue!=starlark.None{
 		value,ok:=platformValue.(*starlarkllb.OCIPlatformValue)
 		if !ok || value==nil{
-			return nil,fmt.Errorf("WithDefaultPlatform: got %s, want llb.oci_platform or None",platformValue.Type())
+			return nil,fmt.Errorf("with_default_platform: got %s, want llb.oci_platform or none",platformValue.Type())
 		}
 		p:=value.Unwrap()
 		platform=&p
@@ -53,11 +53,11 @@ func withDefaultPlatformBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args star
 
 func newResolverBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	options:=make([]buildkitresolver.ImageMetaResolverOpt,len(args))
-	if len(kwargs)!=0{return nil,fmt.Errorf("New: options must be passed positionally")}
+	if len(kwargs)!=0{return nil,fmt.Errorf("new: options must be passed positionally")}
 	for i,arg:=range args{
 		value,ok:=arg.(*imageMetaResolverOptionValue)
 		if !ok || value==nil{
-			return nil,fmt.Errorf("New: argument %d: got %s, want imagemetaresolver.image_meta_resolver_opt",i+1,arg.Type())
+			return nil,fmt.Errorf("new: argument %d: got %s, want imagemetaresolver.image_meta_resolver_opt",i+1,arg.Type())
 		}
 		options[i]=value.option
 	}
@@ -65,7 +65,7 @@ func newResolverBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tup
 }
 
 func defaultResolverBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
-	if len(args)!=0 || len(kwargs)!=0{return nil,fmt.Errorf("Default: does not accept arguments")}
+	if len(args)!=0 || len(kwargs)!=0{return nil,fmt.Errorf("default: does not accept arguments")}
 	return starlarkllb.WrapImageMetaResolver(buildkitresolver.Default()),nil
 }
 

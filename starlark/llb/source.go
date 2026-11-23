@@ -32,29 +32,28 @@ func (v *SourceOpValue) Truth() starlark.Bool  { return starlark.Bool(v != nil &
 func (v *SourceOpValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.source_op") }
 
 func (v *SourceOpValue) Attr(name string) (starlark.Value, error) {
-	name = SnakeCaseIdentifier(name)
-	if v == nil || v.source == nil { return nil, fmt.Errorf("llb.source_op: nil receiver") }
+		if v == nil || v.source == nil { return nil, fmt.Errorf("llb.source_op: nil receiver") }
 	switch name {
-	case "Output", "output":
-		return boundBuiltin("SourceOp.Output", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("SourceOp.Output", args, kwargs, 0, 0); err != nil { return nil, err }
+	case "output":
+		return boundBuiltin("source_op.output", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("source_op.output", args, kwargs, 0, 0); err != nil { return nil, err }
 			return WrapOutput(v.source.Output()), nil
 		}), nil
-	case "Inputs", "inputs":
-		return boundBuiltin("SourceOp.Inputs", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("SourceOp.Inputs", args, kwargs, 0, 0); err != nil { return nil, err }
+	case "inputs":
+		return boundBuiltin("source_op.inputs", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("source_op.inputs", args, kwargs, 0, 0); err != nil { return nil, err }
 			return starlark.NewList(nil), nil
 		}), nil
-	case "Validate", "validate":
-		return boundBuiltin("SourceOp.Validate", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("SourceOp.Validate", args, kwargs, 0, -1); err != nil { return nil, err }
+	case "validate":
+		return boundBuiltin("source_op.validate", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("source_op.validate", args, kwargs, 0, -1); err != nil { return nil, err }
 			constraints, err := constraintsFromArgs(args, 0); if err != nil { return nil, err }
 			if err := v.source.Validate(callContext(thread), constraints); err != nil { return nil, err }
 			return starlark.None, nil
 		}), nil
-	case "Marshal", "marshal":
-		return boundBuiltin("SourceOp.Marshal", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-			if err := arity("SourceOp.Marshal", args, kwargs, 0, -1); err != nil { return nil, err }
+	case "marshal":
+		return boundBuiltin("source_op.marshal", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("source_op.marshal", args, kwargs, 0, -1); err != nil { return nil, err }
 			constraints, err := constraintsFromArgs(args, 0); if err != nil { return nil, err }
 			dgst, data, metadata, sources, err := v.source.Marshal(callContext(thread), constraints)
 			if err != nil { return nil, err }
@@ -66,7 +65,7 @@ func (v *SourceOpValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *SourceOpValue) AttrNames() []string {
-	return SnakeCaseNames([]string{"Inputs", "Marshal", "Output", "Validate", "inputs", "marshal", "output", "validate"})
+	return SnakeCaseNames([]string{"inputs", "marshal", "output", "validate", "inputs", "marshal", "output", "validate"})
 }
 
 // HTTPHeaderValue adapts the public HTTPHeader configuration type.
@@ -86,15 +85,14 @@ func (v *HTTPHeaderValue) Freeze()               {}
 func (v *HTTPHeaderValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
 func (v *HTTPHeaderValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.http_header") }
 func (v *HTTPHeaderValue) Attr(name string) (starlark.Value, error) {
-	name = SnakeCaseIdentifier(name)
-	if v == nil { return nil, fmt.Errorf("llb.http_header: nil receiver") }
+		if v == nil { return nil, fmt.Errorf("llb.http_header: nil receiver") }
 	switch name {
-	case "accept", "Accept": return starlark.String(v.header.Accept), nil
-	case "user_agent", "UserAgent": return starlark.String(v.header.UserAgent), nil
+	case "accept": return starlark.String(v.header.Accept), nil
+	case "user_agent": return starlark.String(v.header.UserAgent), nil
 	default: return nil, nil
 	}
 }
-func (v *HTTPHeaderValue) AttrNames() []string { return SnakeCaseNames([]string{"accept", "user_agent", "Accept", "UserAgent"}) }
+func (v *HTTPHeaderValue) AttrNames() []string { return SnakeCaseNames([]string{"accept", "user_agent", "accept", "user_agent"}) }
 
 // HTTPSignatureInfoValue adapts BuildKit's detached HTTP signature metadata.
 type HTTPSignatureInfoValue struct { info buildkitllb.HTTPSignatureInfo }
@@ -115,15 +113,14 @@ func (v *HTTPSignatureInfoValue) Freeze()               {}
 func (v *HTTPSignatureInfoValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
 func (v *HTTPSignatureInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.http_signature_info") }
 func (v *HTTPSignatureInfoValue) Attr(name string) (starlark.Value, error) {
-	name = SnakeCaseIdentifier(name)
-	if v == nil { return nil, fmt.Errorf("llb.http_signature_info: nil receiver") }
+		if v == nil { return nil, fmt.Errorf("llb.http_signature_info: nil receiver") }
 	switch name {
-	case "pub_key", "PubKey": return starlark.Bytes(v.info.PubKey), nil
-	case "signature", "Signature": return starlark.Bytes(v.info.Signature), nil
+	case "pub_key": return starlark.Bytes(v.info.PubKey), nil
+	case "signature": return starlark.Bytes(v.info.Signature), nil
 	default: return nil, nil
 	}
 }
-func (v *HTTPSignatureInfoValue) AttrNames() []string { return SnakeCaseNames([]string{"pub_key", "signature", "PubKey", "Signature"}) }
+func (v *HTTPSignatureInfoValue) AttrNames() []string { return SnakeCaseNames([]string{"pub_key", "signature", "pub_key", "signature"}) }
 
 func sourceBuiltins() map[string]starlark.Value {
 	members := make(map[string]starlark.Value)
@@ -146,99 +143,99 @@ func sourceBuiltins() map[string]starlark.Value {
 
 func imageSourceBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"Scratch": builtin("Scratch", scratchSourceBuiltin),
-		"Image": builtin("Image", imageSourceBuiltin),
-		"ImageBlob": builtin("ImageBlob", imageBlobSourceBuiltin),
+		"scratch": builtin("scratch", scratchSourceBuiltin),
+		"image": builtin("image", imageSourceBuiltin),
+		"image_blob": builtin("image_blob", imageBlobSourceBuiltin),
 	}
 }
 
 func gitSourceBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"Git": builtin("Git", gitSourceBuiltin),
-		"GitRef": stringOptionBuiltin("GitRef", "GitOption", buildkitllb.GitRef),
-		"GitSubDir": stringOptionBuiltin("GitSubDir", "GitOption", buildkitllb.GitSubDir),
-		"GitSkipSubmodules": builtin("GitSkipSubmodules", gitSkipSubmodulesBuiltin),
-		"GitMTimeCommit": builtin("GitMTimeCommit", gitMTimeCommitBuiltin),
-		"GitMTime": stringOptionBuiltin("GitMTime", "GitOption", buildkitllb.GitMTime),
-		"GitAdvice": boolOptionBuiltin("GitAdvice", "GitOption", buildkitllb.GitAdvice),
-		"GitDebugCommands": boolOptionBuiltin("GitDebugCommands", "GitOption", buildkitllb.GitDebugCommands),
-		"KeepGitDir": builtin("KeepGitDir", keepGitDirBuiltin),
-		"AuthTokenSecret": stringOptionBuiltin("AuthTokenSecret", "GitOption", buildkitllb.AuthTokenSecret),
-		"KnownSSHHosts": stringOptionBuiltin("KnownSSHHosts", "GitOption", buildkitllb.KnownSSHHosts),
-		"MountSSHSock": stringOptionBuiltin("MountSSHSock", "GitOption", buildkitllb.MountSSHSock),
-		"GitChecksum": stringOptionBuiltin("GitChecksum", "GitOption", buildkitllb.GitChecksum),
-		"GitFetchByCommit": builtin("GitFetchByCommit", gitFetchByCommitBuiltin),
-		"GitBundleURL": builtin("GitBundleURL", gitBundleURLBuiltin),
-		"GitBundleOCIStore": builtin("GitBundleOCIStore", gitBundleOCIStoreBuiltin),
-		"GitCheckoutBundle": builtin("GitCheckoutBundle", gitCheckoutBundleBuiltin),
-		"AuthHeaderSecret": stringOptionBuiltin("AuthHeaderSecret", "AuthOption", buildkitllb.AuthHeaderSecret),
+		"git": builtin("git", gitSourceBuiltin),
+		"git_ref": stringOptionBuiltin("git_ref", "git_option", buildkitllb.GitRef),
+		"git_sub_dir": stringOptionBuiltin("git_sub_dir", "git_option", buildkitllb.GitSubDir),
+		"git_skip_submodules": builtin("git_skip_submodules", gitSkipSubmodulesBuiltin),
+		"git_m_time_commit": builtin("git_m_time_commit", gitMTimeCommitBuiltin),
+		"git_m_time": stringOptionBuiltin("git_m_time", "git_option", buildkitllb.GitMTime),
+		"git_advice": boolOptionBuiltin("git_advice", "git_option", buildkitllb.GitAdvice),
+		"git_debug_commands": boolOptionBuiltin("git_debug_commands", "git_option", buildkitllb.GitDebugCommands),
+		"keep_git_dir": builtin("keep_git_dir", keepGitDirBuiltin),
+		"auth_token_secret": stringOptionBuiltin("auth_token_secret", "git_option", buildkitllb.AuthTokenSecret),
+		"known_ssh_hosts": stringOptionBuiltin("known_ssh_hosts", "git_option", buildkitllb.KnownSSHHosts),
+		"mount_ssh_sock": stringOptionBuiltin("mount_ssh_sock", "git_option", buildkitllb.MountSSHSock),
+		"git_checksum": stringOptionBuiltin("git_checksum", "git_option", buildkitllb.GitChecksum),
+		"git_fetch_by_commit": builtin("git_fetch_by_commit", gitFetchByCommitBuiltin),
+		"git_bundle_url": builtin("git_bundle_url", gitBundleURLBuiltin),
+		"git_bundle_oci_store": builtin("git_bundle_oci_store", gitBundleOCIStoreBuiltin),
+		"git_checkout_bundle": builtin("git_checkout_bundle", gitCheckoutBundleBuiltin),
+		"auth_header_secret": stringOptionBuiltin("auth_header_secret", "auth_option", buildkitllb.AuthHeaderSecret),
 	}
 }
 
 func localSourceBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"Local": builtin("Local", localSourceBuiltin),
-		"SessionID": stringOptionBuiltin("SessionID", "LocalOption", buildkitllb.SessionID),
-		"IncludePatterns": stringListOptionBuiltin("IncludePatterns", "LocalOption", buildkitllb.IncludePatterns),
-		"FollowPaths": stringListOptionBuiltin("FollowPaths", "LocalOption", buildkitllb.FollowPaths),
-		"ExcludePatterns": stringListOptionBuiltin("ExcludePatterns", "LocalOption", buildkitllb.ExcludePatterns),
-		"SharedKeyHint": stringOptionBuiltin("SharedKeyHint", "LocalOption", buildkitllb.SharedKeyHint),
-		"Differ": builtin("Differ", differBuiltin),
-		"MetadataOnlyTransfer": stringListOptionBuiltin("MetadataOnlyTransfer", "LocalOption", buildkitllb.MetadataOnlyTransfer),
+		"local": builtin("local", localSourceBuiltin),
+		"session_id": stringOptionBuiltin("session_id", "local_option", buildkitllb.SessionID),
+		"include_patterns": stringListOptionBuiltin("include_patterns", "local_option", buildkitllb.IncludePatterns),
+		"follow_paths": stringListOptionBuiltin("follow_paths", "local_option", buildkitllb.FollowPaths),
+		"exclude_patterns": stringListOptionBuiltin("exclude_patterns", "local_option", buildkitllb.ExcludePatterns),
+		"shared_key_hint": stringOptionBuiltin("shared_key_hint", "local_option", buildkitllb.SharedKeyHint),
+		"differ": builtin("differ", differBuiltin),
+		"metadata_only_transfer": stringListOptionBuiltin("metadata_only_transfer", "local_option", buildkitllb.MetadataOnlyTransfer),
 	}
 }
 
 func ociLayoutSourceBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"OCILayout": builtin("OCILayout", ociLayoutSourceBuiltin),
-		"OCILayoutBlob": builtin("OCILayoutBlob", ociLayoutBlobSourceBuiltin),
-		"OCIStore": builtin("OCIStore", ociStoreBuiltin),
-		"OCILayerLimit": intOptionBuiltin("OCILayerLimit", "OCILayoutOption", buildkitllb.OCILayerLimit),
-		"OCIChecksum": builtin("OCIChecksum", ociChecksumBuiltin),
-		"ImageBlobOCIStore": builtin("ImageBlobOCIStore", imageBlobOCIStoreBuiltin),
+		"oci_layout": builtin("oci_layout", ociLayoutSourceBuiltin),
+		"oci_layout_blob": builtin("oci_layout_blob", ociLayoutBlobSourceBuiltin),
+		"oci_store": builtin("oci_store", ociStoreBuiltin),
+		"oci_layer_limit": intOptionBuiltin("oci_layer_limit", "oci_layout_option", buildkitllb.OCILayerLimit),
+		"oci_checksum": builtin("oci_checksum", ociChecksumBuiltin),
+		"image_blob_oci_store": builtin("image_blob_oci_store", imageBlobOCIStoreBuiltin),
 	}
 }
 
 func httpSourceBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"HTTP": builtin("HTTP", httpSourceBuiltin),
-		"Checksum": builtin("Checksum", httpChecksumBuiltin),
-		"Header": builtin("Header", httpHeaderBuiltin),
-		"VerifyPGPSignature": builtin("VerifyPGPSignature", verifyPGPSignatureBuiltin),
+		"http": builtin("http", httpSourceBuiltin),
+		"checksum": builtin("checksum", httpChecksumBuiltin),
+		"header": builtin("header", httpHeaderBuiltin),
+		"verify_pgp_signature": builtin("verify_pgp_signature", verifyPGPSignatureBuiltin),
 	}
 }
 
 func sourceOpBuiltins() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"NewSource": builtin("NewSource", newSourceBuiltin),
+		"new_source": builtin("new_source", newSourceBuiltin),
 	}
 }
 
 func scratchSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Scratch", args, kwargs, 0, 0); err != nil { return nil, err }
+	if err := arity("scratch", args, kwargs, 0, 0); err != nil { return nil, err }
 	return WrapState(buildkitllb.Scratch()), nil
 }
 
 func imageSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Image", args, kwargs, 1, -1); err != nil { return nil, err }
-	ref, err := stringAt("Image", args, 0); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.ImageOption](args, 1, "ImageOption")
+	if err := arity("image", args, kwargs, 1, -1); err != nil { return nil, err }
+	ref, err := stringAt("image", args, 0); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.ImageOption](args, 1, "image_option")
 	if err != nil { return nil, err }
 	return WrapState(buildkitllb.Image(ref, options...)), nil
 }
 
 func imageBlobSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("ImageBlob", args, kwargs, 1, -1); err != nil { return nil, err }
-	ref, err := stringAt("ImageBlob", args, 0); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.ImageBlobOption](args, 1, "ImageBlobOption")
+	if err := arity("image_blob", args, kwargs, 1, -1); err != nil { return nil, err }
+	ref, err := stringAt("image_blob", args, 0); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.ImageBlobOption](args, 1, "image_blob_option")
 	if err != nil { return nil, err }
 	return WrapState(buildkitllb.ImageBlob(ref, options...)), nil
 }
 
 func gitSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if len(kwargs) != 0 { return nil, fmt.Errorf("Git: use positional URL, optional fragment, then GitOption values") }
-	if len(args) < 1 { return nil, fmt.Errorf("Git: missing repository URL") }
-	url, err := stringAt("Git", args, 0); if err != nil { return nil, err }
+	if len(kwargs) != 0 { return nil, fmt.Errorf("git: use positional url, optional fragment, then git_option values") }
+	if len(args) < 1 { return nil, fmt.Errorf("git: missing repository url") }
+	url, err := stringAt("git", args, 0); if err != nil { return nil, err }
 	fragment := ""
 	start := 1
 	if len(args) > 1 {
@@ -247,55 +244,55 @@ func gitSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tup
 			start = 2
 		}
 	}
-	options, err := optionsFromArgs[buildkitllb.GitOption](args, start, "GitOption")
+	options, err := optionsFromArgs[buildkitllb.GitOption](args, start, "git_option")
 	if err != nil { return nil, err }
 	return WrapState(buildkitllb.Git(url, fragment, options...)), nil
 }
 
 func localSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Local", args, kwargs, 1, -1); err != nil { return nil, err }
-	name, err := stringAt("Local", args, 0); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.LocalOption](args, 1, "LocalOption")
+	if err := arity("local", args, kwargs, 1, -1); err != nil { return nil, err }
+	name, err := stringAt("local", args, 0); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.LocalOption](args, 1, "local_option")
 	if err != nil { return nil, err }
 	return WrapState(buildkitllb.Local(name, options...)), nil
 }
 
 func ociLayoutSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("OCILayout", args, kwargs, 1, -1); err != nil { return nil, err }
-	ref, err := stringAt("OCILayout", args, 0); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.OCILayoutOption](args, 1, "OCILayoutOption")
+	if err := arity("oci_layout", args, kwargs, 1, -1); err != nil { return nil, err }
+	ref, err := stringAt("oci_layout", args, 0); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.OCILayoutOption](args, 1, "oci_layout_option")
 	if err != nil { return nil, err }
 	return WrapState(buildkitllb.OCILayout(ref, options...)), nil
 }
 
 func ociLayoutBlobSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("OCILayoutBlob", args, kwargs, 1, -1); err != nil { return nil, err }
-	ref, err := stringAt("OCILayoutBlob", args, 0); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.ImageBlobOption](args, 1, "ImageBlobOption")
+	if err := arity("oci_layout_blob", args, kwargs, 1, -1); err != nil { return nil, err }
+	ref, err := stringAt("oci_layout_blob", args, 0); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.ImageBlobOption](args, 1, "image_blob_option")
 	if err != nil { return nil, err }
 	return WrapState(buildkitllb.OCILayoutBlob(ref, options...)), nil
 }
 
 func httpSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("HTTP", args, kwargs, 1, -1); err != nil { return nil, err }
-	sourceURL, err := stringAt("HTTP", args, 0); if err != nil { return nil, err }
+	if err := arity("http", args, kwargs, 1, -1); err != nil { return nil, err }
+	sourceURL, err := stringAt("http", args, 0); if err != nil { return nil, err }
 	parsed, err := url.Parse(sourceURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
-		return nil, fmt.Errorf("HTTP: expected an absolute http(s) URL")
+		return nil, fmt.Errorf("http: expected an absolute http(s) url")
 	}
-	options, err := optionsFromArgs[buildkitllb.HTTPOption](args, 1, "HTTPOption")
+	options, err := optionsFromArgs[buildkitllb.HTTPOption](args, 1, "http_option")
 	if err != nil { return nil, err }
 	return WrapState(buildkitllb.HTTP(sourceURL, options...)), nil
 }
 
 func newSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("NewSource", args, kwargs, 1, -1); err != nil { return nil, err }
-	id, err := stringAt("NewSource", args, 0); if err != nil { return nil, err }
+	if err := arity("new_source", args, kwargs, 1, -1); err != nil { return nil, err }
+	id, err := stringAt("new_source", args, 0); if err != nil { return nil, err }
 	var attrs map[string]string
 	start := 1
 	if len(args) > 1 {
 		if _, ok := args[1].(*starlark.Dict); ok {
-			attrs, err = stringDict(args[1], "NewSource attrs")
+			attrs, err = stringDict(args[1], "new_source attrs")
 			if err != nil { return nil, err }
 			start = 2
 		}
@@ -306,90 +303,90 @@ func newSourceBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tup
 }
 
 func gitSkipSubmodulesBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("GitSkipSubmodules", args, kwargs, 0, 0); err != nil { return nil, err }
-	return wrapOption("GitOption", buildkitllb.GitSkipSubmodules()), nil
+	if err := arity("git_skip_submodules", args, kwargs, 0, 0); err != nil { return nil, err }
+	return wrapOption("git_option", buildkitllb.GitSkipSubmodules()), nil
 }
 func gitMTimeCommitBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("GitMTimeCommit", args, kwargs, 0, 0); err != nil { return nil, err }
-	return wrapOption("GitOption", buildkitllb.GitMTimeCommit()), nil
+	if err := arity("git_m_time_commit", args, kwargs, 0, 0); err != nil { return nil, err }
+	return wrapOption("git_option", buildkitllb.GitMTimeCommit()), nil
 }
 func keepGitDirBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("KeepGitDir", args, kwargs, 0, 0); err != nil { return nil, err }
-	return wrapOption("GitOption", buildkitllb.KeepGitDir()), nil
+	if err := arity("keep_git_dir", args, kwargs, 0, 0); err != nil { return nil, err }
+	return wrapOption("git_option", buildkitllb.KeepGitDir()), nil
 }
 func gitFetchByCommitBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("GitFetchByCommit", args, kwargs, 0, 0); err != nil { return nil, err }
-	return wrapOption("GitOption", buildkitllb.GitFetchByCommit()), nil
+	if err := arity("git_fetch_by_commit", args, kwargs, 0, 0); err != nil { return nil, err }
+	return wrapOption("git_option", buildkitllb.GitFetchByCommit()), nil
 }
 func gitCheckoutBundleBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("GitCheckoutBundle", args, kwargs, 0, 0); err != nil { return nil, err }
-	return wrapOption("GitOption", buildkitllb.GitCheckoutBundle()), nil
+	if err := arity("git_checkout_bundle", args, kwargs, 0, 0); err != nil { return nil, err }
+	return wrapOption("git_option", buildkitllb.GitCheckoutBundle()), nil
 }
 
 func gitBundleURLBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("GitBundleURL", args, kwargs, 1, -1); err != nil { return nil, err }
-	locator, err := stringAt("GitBundleURL", args, 0); if err != nil { return nil, err }
-	options, err := optionsFromArgs[buildkitllb.GitBundleOption](args, 1, "GitBundleOption")
+	if err := arity("git_bundle_url", args, kwargs, 1, -1); err != nil { return nil, err }
+	locator, err := stringAt("git_bundle_url", args, 0); if err != nil { return nil, err }
+	options, err := optionsFromArgs[buildkitllb.GitBundleOption](args, 1, "git_bundle_option")
 	if err != nil { return nil, err }
-	return wrapOption("GitOption", buildkitllb.GitBundleURL(locator, options...)), nil
+	return wrapOption("git_option", buildkitllb.GitBundleURL(locator, options...)), nil
 }
 
 func gitBundleOCIStoreBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("GitBundleOCIStore", args, kwargs, 2, 2); err != nil { return nil, err }
-	session, err := stringAt("GitBundleOCIStore", args, 0); if err != nil { return nil, err }
-	store, err := stringAt("GitBundleOCIStore", args, 1); if err != nil { return nil, err }
-	return wrapOption("GitBundleOption", buildkitllb.GitBundleOCIStore(session, store)), nil
+	if err := arity("git_bundle_oci_store", args, kwargs, 2, 2); err != nil { return nil, err }
+	session, err := stringAt("git_bundle_oci_store", args, 0); if err != nil { return nil, err }
+	store, err := stringAt("git_bundle_oci_store", args, 1); if err != nil { return nil, err }
+	return wrapOption("git_bundle_option", buildkitllb.GitBundleOCIStore(session, store)), nil
 }
 
 func differBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Differ", args, kwargs, 2, 2); err != nil { return nil, err }
-	kind, err := stringAt("Differ", args, 0); if err != nil { return nil, err }
-	required, err := boolAt("Differ", args, 1); if err != nil { return nil, err }
-	return wrapOption("LocalOption", buildkitllb.Differ(buildkitllb.DiffType(kind), required)), nil
+	if err := arity("differ", args, kwargs, 2, 2); err != nil { return nil, err }
+	kind, err := stringAt("differ", args, 0); if err != nil { return nil, err }
+	required, err := boolAt("differ", args, 1); if err != nil { return nil, err }
+	return wrapOption("local_option", buildkitllb.Differ(buildkitllb.DiffType(kind), required)), nil
 }
 
 func ociStoreBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("OCIStore", args, kwargs, 2, 2); err != nil { return nil, err }
-	session, err := stringAt("OCIStore", args, 0); if err != nil { return nil, err }
-	store, err := stringAt("OCIStore", args, 1); if err != nil { return nil, err }
-	return wrapOption("OCILayoutOption", buildkitllb.OCIStore(session, store)), nil
+	if err := arity("oci_store", args, kwargs, 2, 2); err != nil { return nil, err }
+	session, err := stringAt("oci_store", args, 0); if err != nil { return nil, err }
+	store, err := stringAt("oci_store", args, 1); if err != nil { return nil, err }
+	return wrapOption("oci_layout_option", buildkitllb.OCIStore(session, store)), nil
 }
 
 func ociChecksumBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("OCIChecksum", args, kwargs, 1, 1); err != nil { return nil, err }
-	raw, err := stringAt("OCIChecksum", args, 0); if err != nil { return nil, err }
-	dgst, err := digest.Parse(raw); if err != nil { return nil, fmt.Errorf("OCIChecksum: %w", err) }
-	return wrapOption("OCILayoutOption", buildkitllb.OCIChecksum(dgst)), nil
+	if err := arity("oci_checksum", args, kwargs, 1, 1); err != nil { return nil, err }
+	raw, err := stringAt("oci_checksum", args, 0); if err != nil { return nil, err }
+	dgst, err := digest.Parse(raw); if err != nil { return nil, fmt.Errorf("oci_checksum: %w", err) }
+	return wrapOption("oci_layout_option", buildkitllb.OCIChecksum(dgst)), nil
 }
 
 func imageBlobOCIStoreBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("ImageBlobOCIStore", args, kwargs, 2, 2); err != nil { return nil, err }
-	session, err := stringAt("ImageBlobOCIStore", args, 0); if err != nil { return nil, err }
-	store, err := stringAt("ImageBlobOCIStore", args, 1); if err != nil { return nil, err }
-	return wrapOption("ImageBlobOption", buildkitllb.ImageBlobOCIStore(session, store)), nil
+	if err := arity("image_blob_oci_store", args, kwargs, 2, 2); err != nil { return nil, err }
+	session, err := stringAt("image_blob_oci_store", args, 0); if err != nil { return nil, err }
+	store, err := stringAt("image_blob_oci_store", args, 1); if err != nil { return nil, err }
+	return wrapOption("image_blob_option", buildkitllb.ImageBlobOCIStore(session, store)), nil
 }
 
 func httpChecksumBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("Checksum", args, kwargs, 1, 1); err != nil { return nil, err }
-	raw, err := stringAt("Checksum", args, 0); if err != nil { return nil, err }
-	dgst, err := digest.Parse(raw); if err != nil { return nil, fmt.Errorf("Checksum: %w", err) }
-	return wrapOption("HTTPOption", buildkitllb.Checksum(dgst)), nil
+	if err := arity("checksum", args, kwargs, 1, 1); err != nil { return nil, err }
+	raw, err := stringAt("checksum", args, 0); if err != nil { return nil, err }
+	dgst, err := digest.Parse(raw); if err != nil { return nil, fmt.Errorf("checksum: %w", err) }
+	return wrapOption("http_option", buildkitllb.Checksum(dgst)), nil
 }
 
 func httpHeaderBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var header buildkitllb.HTTPHeader
-	if err := UnpackArgs("Header", args, kwargs,
+	if err := UnpackArgs("header", args, kwargs,
 		"accept?", &header.Accept,
 		"user_agent?", &header.UserAgent,
 	); err != nil { return nil, err }
-	return wrapOption("HTTPOption", buildkitllb.Header(header)), nil
+	return wrapOption("http_option", buildkitllb.Header(header)), nil
 }
 
 func verifyPGPSignatureBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	if err := arity("VerifyPGPSignature", args, kwargs, 2, 2); err != nil { return nil, err }
-	pubKey, err := bytesAt("VerifyPGPSignature", args, 0); if err != nil { return nil, err }
-	signature, err := bytesAt("VerifyPGPSignature", args, 1); if err != nil { return nil, err }
-	return wrapOption("HTTPOption", buildkitllb.VerifyPGPSignature(buildkitllb.HTTPSignatureInfo{
+	if err := arity("verify_pgp_signature", args, kwargs, 2, 2); err != nil { return nil, err }
+	pubKey, err := bytesAt("verify_pgp_signature", args, 0); if err != nil { return nil, err }
+	signature, err := bytesAt("verify_pgp_signature", args, 1); if err != nil { return nil, err }
+	return wrapOption("http_option", buildkitllb.VerifyPGPSignature(buildkitllb.HTTPSignatureInfo{
 		PubKey: pubKey, Signature: signature,
 	})), nil
 }
@@ -405,15 +402,15 @@ func stringListOptionBuiltin[T any](name, kind string, build func([]string) T) *
 
 func diffTypeValues() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"DiffNone": starlark.String(string(buildkitllb.DiffNone)),
-		"DiffMetadata": starlark.String(string(buildkitllb.DiffMetadata)),
+		"diff_none": starlark.String(string(buildkitllb.DiffNone)),
+		"diff_metadata": starlark.String(string(buildkitllb.DiffMetadata)),
 	}
 }
 
 func gitAuthValues() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"GitAuthHeaderKey": starlark.String(buildkitllb.GitAuthHeaderKey),
-		"GitAuthTokenKey": starlark.String(buildkitllb.GitAuthTokenKey),
+		"git_auth_header_key": starlark.String(buildkitllb.GitAuthHeaderKey),
+		"git_auth_token_key": starlark.String(buildkitllb.GitAuthTokenKey),
 	}
 }
 
@@ -430,6 +427,6 @@ var (
 // imageOptionValues contains ImageOption values rather than source constructors.
 func imageOptionValues() map[string]starlark.Value {
 	return map[string]starlark.Value{
-		"MarkImageInternal": wrapOption("ImageOption", buildkitllb.MarkImageInternal),
+		"mark_image_internal": wrapOption("image_option", buildkitllb.MarkImageInternal),
 	}
 }
