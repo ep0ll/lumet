@@ -65,7 +65,7 @@ func Copy(sources []string, destination string, opts ...Option) Instruction {
 		} else {
 			b.State = b.State.File(action, constraints...)
 		}
-		return b.recordHistory(ctx, "COPY "+strings.Join(sources, " ")+" "+destination, false)
+		return b.recordHistory(ctx, "COPY "+strings.Join(sources, " ")+" "+destination+" # buildkit", false)
 	}
 }
 
@@ -117,7 +117,7 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 		for _, source := range sources {
 			descriptions = append(descriptions, source.Value)
 		}
-		return b.recordHistory(ctx, "ADD "+strings.Join(descriptions, " ")+" "+destination, false)
+		return b.recordHistory(ctx, "ADD "+strings.Join(descriptions, " ")+" "+destination+" # buildkit", false)
 	}
 }
 
