@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"sync"
 
+	spb "github.com/moby/buildkit/sourcepolicy/pb"
 	buildkitllb "github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/client/llb/sourceresolver"
 	digest "github.com/opencontainers/go-digest"
 	"go.starlark.net/starlark"
+	"google.golang.org/protobuf/proto"
 )
 
 // ImageMetaResolverValue wraps BuildKit's ImageMetaResolver interface.
@@ -76,6 +78,163 @@ func (v *ImageMetaResolverValue) AttrNames() []string {
 	return []string{"ResolveImageConfig", "resolve_image_config"}
 }
 
+// SourceResolverOptValue adapts sourceresolver.Opt for callbacks and Go globals.
+type SourceResolverOptValue struct {
+	opt sourceresolver.Opt
+}
+
+// WrapSourceResolverOpt adapts a native sourceresolver.Opt.
+func WrapSourceResolverOpt(opt sourceresolver.Opt) *SourceResolverOptValue {
+	return &SourceResolverOptValue{opt: opt}
+}
+
+// Unwrap returns the native source resolver options.
+func (v *SourceResolverOptValue) Unwrap() sourceresolver.Opt {
+	if v == nil { return sourceresolver.Opt{} }
+	return v.opt
+}
+
+func (v *SourceResolverOptValue) String() string { return "<llb.SourceResolverOpt>" }
+func (v *SourceResolverOptValue) Type() string { return "llb.SourceResolverOpt" }
+func (v *SourceResolverOptValue) Freeze() {}
+func (v *SourceResolverOptValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
+func (v *SourceResolverOptValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.SourceResolverOpt") }
+
+func (v *SourceResolverOptValue) Attr(name string) (starlark.Value, error) {
+	if v == nil { return nil, fmt.Errorf("llb.SourceResolverOpt: nil receiver") }
+	switch name {
+	case "log_name", "LogName":
+		return starlark.String(v.opt.LogName), nil
+	case "image", "ImageOpt":
+		if v.opt.ImageOpt == nil { return starlark.None, nil }
+		return &resolveImageOptValue{opt: *v.opt.ImageOpt}, nil
+	case "oci_layout", "OCILayoutOpt":
+		if v.opt.OCILayoutOpt == nil { return starlark.None, nil }
+		return &resolveOCILayoutOptValue{opt: *v.opt.OCILayoutOpt}, nil
+	case "git", "GitOpt":
+		if v.opt.GitOpt == nil { return starlark.None, nil }
+		return &resolveGitOptValue{opt: *v.opt.GitOpt}, nil
+	case "http", "HTTPOpt":
+		if v.opt.HTTPOpt == nil { return starlark.None, nil }
+		return &resolveHTTPOptValue{opt: *v.opt.HTTPOpt}, nil
+	case "source_policies", "SourcePolicies":
+		values := make([]starlark.Value, len(v.opt.SourcePolicies))
+		for i, policy := range v.opt.SourcePolicies {
+			if policy == nil { values[i] = starlark.None } else { values[i] = starlark.Bytes(mustProtoMarshal(policy)) }
+		}
+		return starlark.NewList(values), nil
+	default:
+		return nil, nil
+	}
+}
+
+func (v *SourceResolverOptValue) AttrNames() []string {
+	return []string{"log_name", "image", "oci_layout", "git", "http", "source_policies",
+		"LogName", "ImageOpt", "OCILayoutOpt", "GitOpt", "HTTPOpt", "SourcePolicies"}
+}
+
+type resolveImageOptValue struct { opt sourceresolver.ResolveImageOpt }
+func (v *resolveImageOptValue) String() string { return "<sourceresolver.ResolveImageOpt>" }
+func (v *resolveImageOptValue) Type() string { return "sourceresolver.ResolveImageOpt" }
+func (v *resolveImageOptValue) Freeze() {}
+func (v *resolveImageOptValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
+func (v *resolveImageOptValue) Hash() (uint32,error) { return 0, fmt.Errorf("unhashable: ResolveImageOpt") }
+func (v *resolveImageOptValue) Attr(name string) (starlark.Value,error) {
+	if v == nil { return nil, fmt.Errorf("ResolveImageOpt: nil receiver") }
+	switch name {
+	case "platform", "Platform":
+		if v.opt.Platform == nil { return starlark.None,nil }
+		return WrapOCIPlatform(*v.opt.Platform),nil
+	case "resolve_mode", "ResolveMode": return starlark.String(v.opt.ResolveMode),nil
+	case "no_config", "NoConfig": return starlark.Bool(v.opt.NoConfig),nil
+	case "attestation_chain", "AttestationChain": return starlark.Bool(v.opt.AttestationChain),nil
+	case "resolve_attestations", "ResolveAttestations": return stringSliceValue(v.opt.ResolveAttestations),nil
+	default: return nil,nil
+	}
+}
+func (v *resolveImageOptValue) AttrNames() []string { return []string{"platform","resolve_mode","no_config","attestation_chain","resolve_attestations","Platform","ResolveMode","NoConfig","AttestationChain","ResolveAttestations"} }
+
+type resolveGitOptValue struct { opt sourceresolver.ResolveGitOpt }
+func (v *resolveGitOptValue) String() string { return "<sourceresolver.ResolveGitOpt>" }
+func (v *resolveGitOptValue) Type() string { return "sourceresolver.ResolveGitOpt" }
+func (v *resolveGitOptValue) Freeze() {}
+func (v *resolveGitOptValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
+func (v *resolveGitOptValue) Hash() (uint32,error) { return 0, fmt.Errorf("unhashable: ResolveGitOpt") }
+func (v *resolveGitOptValue) Attr(name string) (starlark.Value,error) {
+	if name == "return_object" || name == "ReturnObject" { return starlark.Bool(v.opt.ReturnObject),nil }
+	return nil,nil
+}
+func (v *resolveGitOptValue) AttrNames() []string { return []string{"return_object","ReturnObject"} }
+
+type resolveHTTPOptValue struct { opt sourceresolver.ResolveHTTPOpt }
+func (v *resolveHTTPOptValue) String() string { return "<sourceresolver.ResolveHTTPOpt>" }
+func (v *resolveHTTPOptValue) Type() string { return "sourceresolver.ResolveHTTPOpt" }
+func (v *resolveHTTPOptValue) Freeze() {}
+func (v *resolveHTTPOptValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
+func (v *resolveHTTPOptValue) Hash() (uint32,error) { return 0, fmt.Errorf("unhashable: ResolveHTTPOpt") }
+func (v *resolveHTTPOptValue) Attr(name string) (starlark.Value,error) {
+	if name == "checksum_req" || name == "ChecksumReq" {
+		if v.opt.ChecksumReq == nil { return starlark.None,nil }
+		return &resolveHTTPChecksumRequestValue{request:*v.opt.ChecksumReq},nil
+	}
+	return nil,nil
+}
+func (v *resolveHTTPOptValue) AttrNames() []string { return []string{"checksum_req","ChecksumReq"} }
+
+type resolveHTTPChecksumRequestValue struct { request sourceresolver.ResolveHTTPChecksumRequest }
+func (v *resolveHTTPChecksumRequestValue) String() string { return "<sourceresolver.ResolveHTTPChecksumRequest>" }
+func (v *resolveHTTPChecksumRequestValue) Type() string { return "sourceresolver.ResolveHTTPChecksumRequest" }
+func (v *resolveHTTPChecksumRequestValue) Freeze() {}
+func (v *resolveHTTPChecksumRequestValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
+func (v *resolveHTTPChecksumRequestValue) Hash() (uint32,error) { return 0, fmt.Errorf("unhashable: ResolveHTTPChecksumRequest") }
+func (v *resolveHTTPChecksumRequestValue) Attr(name string) (starlark.Value,error) {
+	switch name {
+	case "algo", "Algo": return starlark.MakeInt(int(v.request.Algo)),nil
+	case "suffix", "Suffix": return starlark.Bytes(v.request.Suffix),nil
+	default: return nil,nil
+	}
+}
+func (v *resolveHTTPChecksumRequestValue) AttrNames() []string { return []string{"algo","suffix","Algo","Suffix"} }
+
+type resolveOCILayoutOptValue struct { opt sourceresolver.ResolveOCILayoutOpt }
+func (v *resolveOCILayoutOptValue) String() string { return "<sourceresolver.ResolveOCILayoutOpt>" }
+func (v *resolveOCILayoutOptValue) Type() string { return "sourceresolver.ResolveOCILayoutOpt" }
+func (v *resolveOCILayoutOptValue) Freeze() {}
+func (v *resolveOCILayoutOptValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
+func (v *resolveOCILayoutOptValue) Hash() (uint32,error) { return 0, fmt.Errorf("unhashable: ResolveOCILayoutOpt") }
+func (v *resolveOCILayoutOptValue) Attr(name string) (starlark.Value,error) {
+	switch name {
+	case "platform", "Platform":
+		if v.opt.Platform == nil { return starlark.None,nil }
+		return WrapOCIPlatform(*v.opt.Platform),nil
+	case "store", "Store": return &resolveImageConfigStoreValue{store:v.opt.Store},nil
+	default: return nil,nil
+	}
+}
+func (v *resolveOCILayoutOptValue) AttrNames() []string { return []string{"platform","store","Platform","Store"} }
+
+type resolveImageConfigStoreValue struct { store sourceresolver.ResolveImageConfigOptStore }
+func (v *resolveImageConfigStoreValue) String() string { return "<sourceresolver.ResolveImageConfigOptStore>" }
+func (v *resolveImageConfigStoreValue) Type() string { return "sourceresolver.ResolveImageConfigOptStore" }
+func (v *resolveImageConfigStoreValue) Freeze() {}
+func (v *resolveImageConfigStoreValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
+func (v *resolveImageConfigStoreValue) Hash() (uint32,error) { return 0, fmt.Errorf("unhashable: ResolveImageConfigOptStore") }
+func (v *resolveImageConfigStoreValue) Attr(name string) (starlark.Value,error) {
+	switch name {
+	case "session_id", "SessionID": return starlark.String(v.store.SessionID),nil
+	case "store_id", "StoreID": return starlark.String(v.store.StoreID),nil
+	default: return nil,nil
+	}
+}
+func (v *resolveImageConfigStoreValue) AttrNames() []string { return []string{"session_id","store_id","SessionID","StoreID"} }
+
+type protoMarshaler interface { Marshal() ([]byte,error) }
+func mustProtoMarshal(m proto.Message) []byte {
+	data, err := proto.Marshal(m)
+	if err != nil { return nil }
+	return data
+}
+
 type imageMetaResolverCallback struct {
 	thread   *starlark.Thread
 	callable starlark.Callable
@@ -141,7 +300,7 @@ func resolverBuiltins() map[string]starlark.Value {
 	}
 }
 
-func withMetaResolverBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func withMetaResolverBuiltin(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if err := arity("WithMetaResolver", args, kwargs, 1, 1); err != nil {
 		return nil, err
 	}
@@ -154,7 +313,7 @@ func withMetaResolverBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starl
 	case starlark.Callable:
 		// A callback accepts (ref, SourceResolverOpt) and returns
 		// (resolved_ref, digest_string, config_bytes).
-		resolver = &imageMetaResolverCallback{callable: value}
+		resolver = &imageMetaResolverCallback{thread: thread, callable: value}
 	default:
 		return nil, fmt.Errorf("WithMetaResolver: got %s, want llb.ImageMetaResolver or callable", valueType(args[0]))
 	}
