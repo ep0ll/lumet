@@ -52,6 +52,7 @@ type Build struct {
 	stages        map[string]Stage
 	stageName     string
 	started       bool
+	cmdSet        bool
 	createdAt     *time.Time
 	constraints   []llb.ConstraintsOpt
 	globalArgs    map[string]string
