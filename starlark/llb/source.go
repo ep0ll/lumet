@@ -423,3 +423,11 @@ var (
 	_ starlark.Value    = (*HTTPSignatureInfoValue)(nil)
 	_ starlark.HasAttrs = (*HTTPSignatureInfoValue)(nil)
 )
+
+
+// imageOptionValues contains ImageOption values rather than source constructors.
+func imageOptionValues() map[string]starlark.Value {
+	return map[string]starlark.Value{
+		"MarkImageInternal": wrapOption("ImageOption", buildkitllb.MarkImageInternal),
+	}
+}
