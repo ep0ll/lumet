@@ -151,6 +151,9 @@ func Arg(name string, opts ...Option) Instruction {
 			exists = true
 		}
 		if b.started && !exists {
+			value, exists = b.stageArgs[name]
+		}
+		if b.started && !exists {
 			value, exists = b.globalArgs[name]
 		}
 		if !exists && !b.started {
