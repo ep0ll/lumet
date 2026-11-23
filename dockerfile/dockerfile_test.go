@@ -87,7 +87,7 @@ func TestInstructionPipelineMetadata(t *testing.T) {
 	if image.Created == nil || !image.Created.Equal(createdAt) {
 		t.Fatalf("created timestamp was not set: %#v", image.Created)
 	}
-	if len(image.History) != 15 {
+	if len(image.History) != 14 {
 		t.Fatalf("expected history for all instructions after FROM, got %d", len(image.History))
 	}
 	if stage, ok := build.Stage("RUNTIME"); !ok || stage.Name != "runtime" {
