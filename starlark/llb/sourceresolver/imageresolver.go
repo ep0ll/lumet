@@ -12,7 +12,6 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.starlark.net/starlark"
-	"go.starlark.net/starlarkstruct"
 )
 
 // metaResolverCallback implements BuildKit's MetaResolver interface by invoking
@@ -248,11 +247,8 @@ func builtins()map[string]starlark.Value{
 	return members
 }
 
-func sourceResolverTypesBuiltins()map[string]starlark.Value{return map[string]starlark.Value{}}
-
 var (
 	_ buildkitsourceresolver.MetaResolver = (*metaResolverCallback)(nil)
 	_ starlark.Value = (*SourceOpValue)(nil)
 	_ starlark.HasAttrs = (*SourceOpValue)(nil)
-	_ = time.Time{}
 )
