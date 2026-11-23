@@ -309,3 +309,23 @@ func TestArgOverridesBaseImageEnvironment(t *testing.T) {
 		t.Fatalf("ARG should replace inherited base image environment until ENV overrides it: %q", got)
 	}
 }
+
+
+func TestHealthcheckDockerDefaults(t *testing.T) {
+	build := New()
+	if err := build.Apply(context.Background(),
+		From("scratch"),
+		Healthcheck(Sh("true")),
+	); err != nil {
+		t.Fatal(err)
+	}
+	health := build.Image.Config.Healthcheck
+	if health == nil {
+		t.Fatal("healthcheck config was not set")
+	}
+	if health.Interval != 30*time.Second || health.Timeout != 30*time.Second ||
+		health.StartPeriod != 0 || health.StartInterval != 5*time.Second ||
+		health.Retries != 3 {
+		t.Fatalf("unexpected Dockerfile healthcheck defaults: %#v", health)
+	}
+}
