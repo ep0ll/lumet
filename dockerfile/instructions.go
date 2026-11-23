@@ -201,7 +201,7 @@ func Env(values ...KeyValue) Instruction {
 			if item.Key == "" {
 				return fmt.Errorf("ENV: key cannot be empty")
 			}
-			value := expandVariables(item.Value, previousEnv, nil)
+			value := expandVariablesWithEscape(item.Value, previousEnv, b.EscapeToken)
 			b.State = b.State.AddEnv(item.Key, value)
 			b.Image.Config.Env = setEnv(b.Image.Config.Env, item.Key, value)
 			b.stageEnv[item.Key] = value
@@ -582,19 +582,35 @@ func setEnv(env []string, key, value string) []string {
 }
 
 func expandVariables(value string, args map[string]string, env []string) string {
+	return expandVariablesWithEscape(value, mergeEnvironment(args, env), 0)
+}
+
+func expandVariablesWithEscape(value string, environment map[string]string, escape rune) string {
+	expanded, err := expand.New(
+		expand.Config{Escape: escape},
+		expand.MapLookup(environment),
+	).Expand(value)
+	if err != nil {
+		// Instruction APIs historically expose string expansion. Malformed
+		// expressions are left untouched; callers needing strict validation
+		// can use the standalone dockerfile/expand package directly.
+		return value
+	}
+	return expanded
+}
+
+func mergeEnvironment(args map[string]string, env []string) map[string]string {
 	environment := make(map[string]string, len(args)+len(env))
-	for key, current := range args {
-		environment[key] = current
+	for key, value := range args {
+		environment[key] = value
 	}
 	for _, item := range env {
-		key, current, found := strings.Cut(item, "=")
+		key, value, found := strings.Cut(item, "=")
 		if found {
-			environment[key] = current
+			environment[key] = value
 		}
 	}
-	return os.Expand(value, func(key string) string {
-		return environment[key]
-	})
+	return environment
 }
 
 func expandPorts(value string) ([]string, error) {
