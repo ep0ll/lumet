@@ -325,6 +325,97 @@ func (v *StateValue) Attr(name string) (starlark.Value, error) {
 	}
 	state := v.state
 	switch name {
+	case "SetMarshalDefaults", "set_marshal_defaults":
+		return boundBuiltin("State.SetMarshalDefaults", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.SetMarshalDefaults", args, kwargs, 0, -1); err != nil { return nil, err }
+			opts, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+			if err != nil { return nil, err }
+			return WrapState(state.SetMarshalDefaults(opts...)), nil
+		}), nil
+	case "WithImageConfig", "with_image_config":
+		return boundBuiltin("State.WithImageConfig", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.WithImageConfig", args, kwargs, 1, 1); err != nil { return nil, err }
+			data, err := bytesAt("State.WithImageConfig", args, 0)
+			if err != nil { return nil, err }
+			updated, err := state.WithImageConfig(data)
+			if err != nil { return nil, err }
+			return WrapState(updated), nil
+		}), nil
+	case "GetDir", "get_dir":
+		return boundBuiltin("State.GetDir", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.GetDir", args, kwargs, 0, -1); err != nil { return nil, err }
+			opts, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+			if err != nil { return nil, err }
+			dir, err := state.GetDir(callContext(thread), opts...)
+			if err != nil { return nil, err }
+			return starlark.String(dir), nil
+		}), nil
+	case "GetEnv", "get_env":
+		return boundBuiltin("State.GetEnv", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.GetEnv", args, kwargs, 1, -1); err != nil { return nil, err }
+			key, err := stringAt("State.GetEnv", args, 0)
+			if err != nil { return nil, err }
+			opts, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 1, "ConstraintsOpt")
+			if err != nil { return nil, err }
+			value, found, err := state.GetEnv(callContext(thread), key, opts...)
+			if err != nil { return nil, err }
+			return starlark.Tuple{starlark.String(value), starlark.Bool(found)}, nil
+		}), nil
+	case "GetArgs", "get_args":
+		return boundBuiltin("State.GetArgs", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.GetArgs", args, kwargs, 0, -1); err != nil { return nil, err }
+			opts, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+			if err != nil { return nil, err }
+			values, err := state.GetArgs(callContext(thread), opts...)
+			if err != nil { return nil, err }
+			return stringSliceValue(values), nil
+		}), nil
+	case "GetHostname", "get_hostname":
+		return boundBuiltin("State.GetHostname", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.GetHostname", args, kwargs, 0, -1); err != nil { return nil, err }
+			opts, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+			if err != nil { return nil, err }
+			value, err := state.GetHostname(callContext(thread), opts...)
+			if err != nil { return nil, err }
+			return starlark.String(value), nil
+		}), nil
+	case "GetNetwork", "get_network":
+		return boundBuiltin("State.GetNetwork", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.GetNetwork", args, kwargs, 0, -1); err != nil { return nil, err }
+			opts, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+			if err != nil { return nil, err }
+			value, err := state.GetNetwork(callContext(thread), opts...)
+			if err != nil { return nil, err }
+			return starlark.MakeInt(int(value)), nil
+		}), nil
+	case "GetSecurity", "get_security":
+		return boundBuiltin("State.GetSecurity", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.GetSecurity", args, kwargs, 0, -1); err != nil { return nil, err }
+			opts, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+			if err != nil { return nil, err }
+			value, err := state.GetSecurity(callContext(thread), opts...)
+			if err != nil { return nil, err }
+			return starlark.MakeInt(int(value)), nil
+		}), nil
+	case "GetPlatform", "get_platform":
+		return boundBuiltin("State.GetPlatform", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.GetPlatform", args, kwargs, 0, -1); err != nil { return nil, err }
+			opts, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+			if err != nil { return nil, err }
+			value, err := state.GetPlatform(callContext(thread), opts...)
+			if err != nil { return nil, err }
+			if value == nil { return starlark.None, nil }
+			return &platformValue{platform: *value}, nil
+		}), nil
+	case "Env", "env":
+		return boundBuiltin("State.Env", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			if err := arity("State.Env", args, kwargs, 0, -1); err != nil { return nil, err }
+			opts, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 0, "ConstraintsOpt")
+			if err != nil { return nil, err }
+			env, err := state.Env(callContext(thread), opts...)
+			if err != nil { return nil, err }
+			return stringSliceValue(env.ToArray()), nil
+		}), nil
 	case "Marshal", "marshal":
 		return boundBuiltin("State.Marshal", func(thread *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 			if err := arity("State.Marshal", args, kwargs, 0, -1); err != nil {
@@ -462,12 +553,12 @@ func (v *StateValue) Attr(name string) (starlark.Value, error) {
 
 func (v *StateValue) AttrNames() []string {
 	names := []string{
-		"AddEnv", "AddEnvf", "AddExtraHost", "AddUlimit", "DelEnv", "Marshal",
+		"AddEnv", "AddEnvf", "AddExtraHost", "AddUlimit", "DelEnv", "Env", "GetArgs", "GetDir", "GetEnv", "GetHostname", "GetNetwork", "GetPlatform", "GetSecurity", "Marshal",
 		"Dir", "Dirf", "File", "Hostname", "Network", "Platform",
 		"Requires", "Reset", "Run", "Security", "User", "With",
-		"WithCgroupParent", "add_env", "add_envf", "add_extra_host",
+		"WithCgroupParent", "SetMarshalDefaults", "WithImageConfig", "add_env", "add_envf", "add_extra_host",
 		"add_ulimit", "del_env", "dir", "dirf", "file", "hostname",
-		"marshal", "network", "platform", "requires", "reset", "run", "security",
+		"env", "get_args", "get_dir", "get_env", "get_hostname", "get_network", "get_platform", "get_security", "marshal", "network", "platform", "requires", "reset", "run", "security", "set_marshal_defaults", "with_image_config",
 		"user", "with", "with_cgroup_parent",
 	}
 	sort.Strings(names)
@@ -510,6 +601,14 @@ func (v *ExecStateValue) Attr(name string) (starlark.Value, error) {
 
 func (v *ExecStateValue) AttrNames() []string {
 	return []string{"AddMount", "GetMount", "Root", "add_mount", "get_mount", "root"}
+}
+
+func stringSliceValue(values []string) starlark.Value {
+	items := make([]starlark.Value, len(values))
+	for i, value := range values {
+		items[i] = starlark.String(value)
+	}
+	return starlark.NewList(items)
 }
 
 func stateStringMethod(name string, fn func(string) buildkitllb.State) starlark.Value {
