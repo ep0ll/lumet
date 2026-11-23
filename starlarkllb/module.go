@@ -1,15 +1,13 @@
 package starlarkllb
 
 import (
-	"fmt"
-
 	"go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
 )
 
 // Module returns the top-level "llb" Starlark module.
 // It is a thin binding over github.com/moby/buildkit/client/llb.
-funcfunc Module() *starlarkstruct.Module {
+func Module() *starlarkstruct.Module {
 	return &starlarkstruct.Module{
 		Name: "llb",
 		Members: starlark.StringDict{
