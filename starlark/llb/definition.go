@@ -25,14 +25,15 @@ func (v *DefinitionOpValue) Unwrap() *buildkitllb.DefinitionOp {
 	return v.op
 }
 
-func (v *DefinitionOpValue) String() string        { return "<llb.DefinitionOp>" }
-func (v *DefinitionOpValue) Type() string          { return "llb.DefinitionOp" }
+func (v *DefinitionOpValue) String() string        { return "<llb.definition_op>" }
+func (v *DefinitionOpValue) Type() string          { return "llb.definition_op" }
 func (v *DefinitionOpValue) Freeze()               {}
 func (v *DefinitionOpValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.op != nil) }
-func (v *DefinitionOpValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.DefinitionOp") }
+func (v *DefinitionOpValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.definition_op") }
 
 func (v *DefinitionOpValue) Attr(name string) (starlark.Value, error) {
-	if v == nil || v.op == nil { return nil, fmt.Errorf("llb.DefinitionOp: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil || v.op == nil { return nil, fmt.Errorf("llb.definition_op: nil receiver") }
 	switch name {
 	case "State", "state":
 		return boundBuiltin("DefinitionOp.State",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
@@ -72,7 +73,7 @@ func (v *DefinitionOpValue) Attr(name string) (starlark.Value, error) {
 			constraints,err:=constraintsFromArgs(args,0);if err!=nil{return nil,err}
 			input,err:=v.op.ToInput(callContext(thread),constraints);if err!=nil{return nil,err}
 			if input==nil{return starlark.None,nil}
-			return starlarkstructValue("llb.Input",starlark.StringDict{
+			return starlarkstructValue("llb.input",starlark.StringDict{
 				"digest":starlark.String(input.Digest),
 				"index":starlark.MakeInt64(input.Index),
 			}),nil
@@ -82,7 +83,7 @@ func (v *DefinitionOpValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *DefinitionOpValue) AttrNames()[]string{
-	return []string{"State","Output","Inputs","Validate","Marshal","ToInput","state","output","inputs","validate","marshal","to_input"}
+	return SnakeCaseNames([]string{"State","Output","Inputs","Validate","Marshal","ToInput","state","output","inputs","validate","marshal","to_input"})
 }
 
 func outputListValue(outputs []buildkitllb.Output) starlark.Value {
@@ -107,7 +108,7 @@ func newDefinitionOpBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark
 	case *DefinitionValue:
 		if value!=nil&&value.definition!=nil{definition=value.definition.ToPB()}
 	default:
-		return nil,fmt.Errorf("NewDefinitionOp: got %s, want llb.Definition or llb.DefinitionPB",valueType(args[0]))
+		return nil,fmt.Errorf("NewDefinitionOp: got %s, want llb.definition or llb.definition_pb",valueType(args[0]))
 	}
 	if definition==nil{return nil,fmt.Errorf("NewDefinitionOp: definition must not be nil")}
 	op,err:=buildkitllb.NewDefinitionOp(definition)

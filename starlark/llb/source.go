@@ -25,14 +25,15 @@ func (v *SourceOpValue) Unwrap() *buildkitllb.SourceOp {
 	return v.source
 }
 
-func (v *SourceOpValue) String() string        { return "<llb.SourceOp>" }
-func (v *SourceOpValue) Type() string          { return "llb.SourceOp" }
+func (v *SourceOpValue) String() string        { return "<llb.source_op>" }
+func (v *SourceOpValue) Type() string          { return "llb.source_op" }
 func (v *SourceOpValue) Freeze()               {}
 func (v *SourceOpValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.source != nil) }
-func (v *SourceOpValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.SourceOp") }
+func (v *SourceOpValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.source_op") }
 
 func (v *SourceOpValue) Attr(name string) (starlark.Value, error) {
-	if v == nil || v.source == nil { return nil, fmt.Errorf("llb.SourceOp: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil || v.source == nil { return nil, fmt.Errorf("llb.source_op: nil receiver") }
 	switch name {
 	case "Output", "output":
 		return boundBuiltin("SourceOp.Output", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -65,7 +66,7 @@ func (v *SourceOpValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *SourceOpValue) AttrNames() []string {
-	return []string{"Inputs", "Marshal", "Output", "Validate", "inputs", "marshal", "output", "validate"}
+	return SnakeCaseNames([]string{"Inputs", "Marshal", "Output", "Validate", "inputs", "marshal", "output", "validate"})
 }
 
 // HTTPHeaderValue adapts the public HTTPHeader configuration type.
@@ -79,20 +80,21 @@ func (v *HTTPHeaderValue) Unwrap() buildkitllb.HTTPHeader {
 	if v == nil { return buildkitllb.HTTPHeader{} }
 	return v.header
 }
-func (v *HTTPHeaderValue) String() string        { return "<llb.HTTPHeader>" }
-func (v *HTTPHeaderValue) Type() string          { return "llb.HTTPHeader" }
+func (v *HTTPHeaderValue) String() string        { return "<llb.http_header>" }
+func (v *HTTPHeaderValue) Type() string          { return "llb.http_header" }
 func (v *HTTPHeaderValue) Freeze()               {}
 func (v *HTTPHeaderValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *HTTPHeaderValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.HTTPHeader") }
+func (v *HTTPHeaderValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.http_header") }
 func (v *HTTPHeaderValue) Attr(name string) (starlark.Value, error) {
-	if v == nil { return nil, fmt.Errorf("llb.HTTPHeader: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil { return nil, fmt.Errorf("llb.http_header: nil receiver") }
 	switch name {
 	case "accept", "Accept": return starlark.String(v.header.Accept), nil
 	case "user_agent", "UserAgent": return starlark.String(v.header.UserAgent), nil
 	default: return nil, nil
 	}
 }
-func (v *HTTPHeaderValue) AttrNames() []string { return []string{"accept", "user_agent", "Accept", "UserAgent"} }
+func (v *HTTPHeaderValue) AttrNames() []string { return SnakeCaseNames([]string{"accept", "user_agent", "Accept", "UserAgent"}) }
 
 // HTTPSignatureInfoValue adapts BuildKit's detached HTTP signature metadata.
 type HTTPSignatureInfoValue struct { info buildkitllb.HTTPSignatureInfo }
@@ -107,20 +109,21 @@ func (v *HTTPSignatureInfoValue) Unwrap() buildkitllb.HTTPSignatureInfo {
 	if v == nil { return buildkitllb.HTTPSignatureInfo{} }
 	return buildkitllb.HTTPSignatureInfo{PubKey: append([]byte(nil), v.info.PubKey...), Signature: append([]byte(nil), v.info.Signature...)}
 }
-func (v *HTTPSignatureInfoValue) String() string        { return "<llb.HTTPSignatureInfo>" }
-func (v *HTTPSignatureInfoValue) Type() string          { return "llb.HTTPSignatureInfo" }
+func (v *HTTPSignatureInfoValue) String() string        { return "<llb.http_signature_info>" }
+func (v *HTTPSignatureInfoValue) Type() string          { return "llb.http_signature_info" }
 func (v *HTTPSignatureInfoValue) Freeze()               {}
 func (v *HTTPSignatureInfoValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *HTTPSignatureInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.HTTPSignatureInfo") }
+func (v *HTTPSignatureInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.http_signature_info") }
 func (v *HTTPSignatureInfoValue) Attr(name string) (starlark.Value, error) {
-	if v == nil { return nil, fmt.Errorf("llb.HTTPSignatureInfo: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil { return nil, fmt.Errorf("llb.http_signature_info: nil receiver") }
 	switch name {
 	case "pub_key", "PubKey": return starlark.Bytes(v.info.PubKey), nil
 	case "signature", "Signature": return starlark.Bytes(v.info.Signature), nil
 	default: return nil, nil
 	}
 }
-func (v *HTTPSignatureInfoValue) AttrNames() []string { return []string{"pub_key", "signature", "PubKey", "Signature"} }
+func (v *HTTPSignatureInfoValue) AttrNames() []string { return SnakeCaseNames([]string{"pub_key", "signature", "PubKey", "Signature"}) }
 
 func sourceBuiltins() map[string]starlark.Value {
 	members := make(map[string]starlark.Value)
@@ -375,7 +378,7 @@ func httpChecksumBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.
 
 func httpHeaderBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var header buildkitllb.HTTPHeader
-	if err := starlark.UnpackArgs("Header", args, kwargs,
+	if err := UnpackArgs("Header", args, kwargs,
 		"accept?", &header.Accept,
 		"user_agent?", &header.UserAgent,
 	); err != nil { return nil, err }

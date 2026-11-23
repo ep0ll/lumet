@@ -20,15 +20,16 @@ func WrapEnvList(env *buildkitllb.EnvList) *EnvListValue {
 	return &EnvListValue{env: env}
 }
 
-func (v *EnvListValue) String() string        { return "<llb.EnvList>" }
-func (v *EnvListValue) Type() string          { return "llb.EnvList" }
+func (v *EnvListValue) String() string        { return "<llb.env_list>" }
+func (v *EnvListValue) Type() string          { return "llb.env_list" }
 func (v *EnvListValue) Freeze()               {}
 func (v *EnvListValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.env != nil) }
-func (v *EnvListValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.EnvList") }
+func (v *EnvListValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.env_list") }
 
 func (v *EnvListValue) Attr(name string) (starlark.Value, error) {
+	name = SnakeCaseIdentifier(name)
 	if v == nil || v.env == nil {
-		return nil, fmt.Errorf("llb.EnvList: nil receiver")
+		return nil, fmt.Errorf("llb.env_list: nil receiver")
 	}
 	switch name {
 	case "AddOrReplace", "add_or_replace":
@@ -75,8 +76,8 @@ func (v *EnvListValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *EnvListValue) AttrNames() []string {
-	return []string{"AddOrReplace", "Delete", "Get", "Keys", "SetDefault", "ToArray",
-		"add_or_replace", "delete", "get", "keys", "set_default", "to_array"}
+	return SnakeCaseNames([]string{"AddOrReplace", "Delete", "Get", "Keys", "SetDefault", "ToArray",
+		"add_or_replace", "delete", "get", "keys", "set_default", "to_array"})
 }
 
 // HostIPValue adapts BuildKit's host-to-IP mapping.
@@ -89,14 +90,15 @@ func WrapHostIP(hostIP buildkitllb.HostIP) *HostIPValue {
 	return &HostIPValue{hostIP: hostIP}
 }
 
-func (v *HostIPValue) String() string        { return "<llb.HostIP>" }
-func (v *HostIPValue) Type() string          { return "llb.HostIP" }
+func (v *HostIPValue) String() string        { return "<llb.host_ip>" }
+func (v *HostIPValue) Type() string          { return "llb.host_ip" }
 func (v *HostIPValue) Freeze()               {}
 func (v *HostIPValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *HostIPValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.HostIP") }
+func (v *HostIPValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.host_ip") }
 
 func (v *HostIPValue) Attr(name string) (starlark.Value, error) {
-	if v == nil { return nil, fmt.Errorf("llb.HostIP: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil { return nil, fmt.Errorf("llb.host_ip: nil receiver") }
 	switch name {
 	case "host", "Host":
 		return starlark.String(v.hostIP.Host), nil
@@ -107,7 +109,7 @@ func (v *HostIPValue) Attr(name string) (starlark.Value, error) {
 	}
 }
 
-func (v *HostIPValue) AttrNames() []string { return []string{"host", "ip", "Host", "IP"} }
+func (v *HostIPValue) AttrNames() []string { return SnakeCaseNames([]string{"host", "ip", "Host", "IP"}) }
 
 // LinuxResourcesValue adapts BuildKit's container resource limits.
 type LinuxResourcesValue struct {
@@ -119,14 +121,15 @@ func WrapLinuxResources(resources buildkitllb.LinuxResources) *LinuxResourcesVal
 	return &LinuxResourcesValue{resources: resources}
 }
 
-func (v *LinuxResourcesValue) String() string        { return "<llb.LinuxResources>" }
-func (v *LinuxResourcesValue) Type() string          { return "llb.LinuxResources" }
+func (v *LinuxResourcesValue) String() string        { return "<llb.linux_resources>" }
+func (v *LinuxResourcesValue) Type() string          { return "llb.linux_resources" }
 func (v *LinuxResourcesValue) Freeze()               {}
 func (v *LinuxResourcesValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *LinuxResourcesValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.LinuxResources") }
+func (v *LinuxResourcesValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.linux_resources") }
 
 func (v *LinuxResourcesValue) Attr(name string) (starlark.Value, error) {
-	if v == nil { return nil, fmt.Errorf("llb.LinuxResources: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil { return nil, fmt.Errorf("llb.linux_resources: nil receiver") }
 	switch name {
 	case "memory", "Memory":
 		return starlark.MakeInt64(v.resources.Memory), nil
@@ -148,8 +151,8 @@ func (v *LinuxResourcesValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *LinuxResourcesValue) AttrNames() []string {
-	return []string{"memory", "memory_swap", "cpu_shares", "cpu_period", "cpu_quota", "cpuset_cpus", "cpuset_mems",
-		"Memory", "MemorySwap", "CPUShares", "CPUPeriod", "CPUQuota", "CpusetCpus", "CpusetMems"}
+	return SnakeCaseNames([]string{"memory", "memory_swap", "cpu_shares", "cpu_period", "cpu_quota", "cpuset_cpus", "cpuset_mems",
+		"Memory", "MemorySwap", "CPUShares", "CPUPeriod", "CPUQuota", "CpusetCpus", "CpusetMems"})
 }
 
 func (v *StateValue) stateMetaAttr(name string) (starlark.Value, bool, error) {
@@ -216,7 +219,7 @@ func (v *StateValue) stateMetaAttr(name string) (starlark.Value, bool, error) {
 		return boundBuiltin("State.Platform", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 			if err := arity("State.Platform", args, kwargs, 1, 1); err != nil { return nil, err }
 			platform, ok := args[0].(*OCIPlatformValue)
-			if !ok || platform == nil { return nil, fmt.Errorf("State.Platform: got %s, want llb.OCIPlatform", valueType(args[0])) }
+			if !ok || platform == nil { return nil, fmt.Errorf("State.Platform: got %s, want llb.oci_platform", valueType(args[0])) }
 			return WrapState(state.Platform(platform.platform)), nil
 		}), true, nil
 	case "AddExtraHost", "add_extra_host":
@@ -410,7 +413,7 @@ func metaBuiltins() map[string]starlark.Value {
 
 func linuxResourcesBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var resources buildkitllb.LinuxResources
-	if err := starlark.UnpackArgs("LinuxResources", args, kwargs,
+	if err := UnpackArgs("LinuxResources", args, kwargs,
 		"memory?", &resources.Memory,
 		"memory_swap?", &resources.MemorySwap,
 		"cpu_shares?", &resources.CPUShares,
@@ -449,7 +452,7 @@ func securityModeValues() map[string]starlark.Value {
 func (v *StateValue) stateMetaAttrNames() []string {
 	names := append([]string(nil), stateMetaAttrNames...)
 	sort.Strings(names)
-	return compactStrings(names)
+	return SnakeCaseNames(compactStrings(names))
 }
 
 var (
@@ -487,13 +490,13 @@ func stateStringPairMethod(name string, fn func(string, string) buildkitllb.Stat
 
 func newOpMetadataBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if len(kwargs) != 0 || len(args) > 1 {
-		return nil, fmt.Errorf("NewOpMetadata: expected zero or one llb.OpMetadataPB argument")
+		return nil, fmt.Errorf("NewOpMetadata: expected zero or one llb.op_metadata_pb argument")
 	}
 	var native *pb.OpMetadata
 	if len(args) == 1 && args[0] != starlark.None {
 		value, ok := args[0].(*OpMetadataProtoValue)
 		if !ok || value == nil {
-			return nil, fmt.Errorf("NewOpMetadata: got %s, want llb.OpMetadataPB or None", valueType(args[0]))
+			return nil, fmt.Errorf("NewOpMetadata: got %s, want llb.op_metadata_pb or None", valueType(args[0]))
 		}
 		native = value.metadata
 	}

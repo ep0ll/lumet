@@ -13,13 +13,14 @@ type DiffOpValue struct { op *buildkitllb.DiffOp }
 // WrapDiffOp adapts a native DiffOp.
 func WrapDiffOp(op *buildkitllb.DiffOp)*DiffOpValue{return &DiffOpValue{op:op}}
 func (v *DiffOpValue) Unwrap()*buildkitllb.DiffOp{if v==nil{return nil};return v.op}
-func (v *DiffOpValue) String()string{return "<llb.DiffOp>"}
-func (v *DiffOpValue) Type()string{return "llb.DiffOp"}
+func (v *DiffOpValue) String()string{return "<llb.diff_op>"}
+func (v *DiffOpValue) Type()string{return "llb.diff_op"}
 func (v *DiffOpValue) Freeze(){}
 func (v *DiffOpValue) Truth()starlark.Bool{return starlark.Bool(v!=nil&&v.op!=nil)}
-func (v *DiffOpValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llb.DiffOp")}
+func (v *DiffOpValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llb.diff_op")}
 func (v *DiffOpValue) Attr(name string)(starlark.Value,error){
-	if v==nil||v.op==nil{return nil,fmt.Errorf("llb.DiffOp: nil receiver")}
+	name = SnakeCaseIdentifier(name)
+	if v==nil||v.op==nil{return nil,fmt.Errorf("llb.diff_op: nil receiver")}
 	switch name{
 	case "Output","output":
 		return boundBuiltin("DiffOp.Output",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
@@ -48,7 +49,7 @@ func (v *DiffOpValue) Attr(name string)(starlark.Value,error){
 	default:return nil,nil
 	}
 }
-func (v *DiffOpValue) AttrNames()[]string{return []string{"Output","Inputs","Validate","Marshal","output","inputs","validate","marshal"}}
+func (v *DiffOpValue) AttrNames()[]string{return SnakeCaseNames([]string{"Output","Inputs","Validate","Marshal","output","inputs","validate","marshal"})}
 
 func diffBuiltins()map[string]starlark.Value{
 	return map[string]starlark.Value{
@@ -67,7 +68,7 @@ func newDiffBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,k
 	if err:=arity("NewDiff",args,kwargs,3,3);err!=nil{return nil,err}
 	lower,err:=stateFromValue(args[0]);if err!=nil{return nil,err}
 	upper,err:=stateFromValue(args[1]);if err!=nil{return nil,err}
-	constraints,ok:=args[2].(*ConstraintsValue);if !ok||constraints==nil{return nil,fmt.Errorf("NewDiff: argument 3: want llb.Constraints")}
+	constraints,ok:=args[2].(*ConstraintsValue);if !ok||constraints==nil{return nil,fmt.Errorf("NewDiff: argument 3: want llb.constraints")}
 	return WrapDiffOp(buildkitllb.NewDiff(lower,upper,constraints.Unwrap())),nil
 }
 

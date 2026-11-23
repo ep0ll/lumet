@@ -17,16 +17,16 @@ type optionValue struct {
 
 func (v *optionValue) String() string {
 	if v == nil {
-		return "<llb.Option nil>"
+		return "<llb.option nil>"
 	}
-	return "<llb." + v.kind + ">"
+	return "<llb." + SnakeCaseIdentifier(v.kind) + ">"
 }
 
 func (v *optionValue) Type() string {
 	if v == nil || v.kind == "" {
-		return "llb.Option"
+		return "llb.option"
 	}
-	return "llb." + v.kind
+	return "llb." + SnakeCaseIdentifier(v.kind)
 }
 
 func (v *optionValue) Freeze() {}
@@ -256,11 +256,11 @@ func stringDict(value starlark.Value, name string) (map[string]string, error) {
 }
 
 func builtin(name string, fn func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error)) *starlark.Builtin {
-	return starlark.NewBuiltin(name, fn)
+	return starlark.NewBuiltin(SnakeCaseIdentifier(name), fn)
 }
 
 func boundBuiltin(name string, fn func(*starlark.Thread, starlark.Tuple, []starlark.Tuple) (starlark.Value, error)) *starlark.Builtin {
-	return starlark.NewBuiltin(name, func(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	return starlark.NewBuiltin(SnakeCaseIdentifier(name), func(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 		return fn(thread, args, kwargs)
 	})
 }

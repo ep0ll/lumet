@@ -25,14 +25,15 @@ func (v *FileActionValue) Unwrap() *buildkitllb.FileAction {
 	return v.action
 }
 
-func (v *FileActionValue) String() string        { return "<llb.FileAction>" }
-func (v *FileActionValue) Type() string          { return "llb.FileAction" }
+func (v *FileActionValue) String() string        { return "<llb.file_action>" }
+func (v *FileActionValue) Type() string          { return "llb.file_action" }
 func (v *FileActionValue) Freeze()               {}
 func (v *FileActionValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.action != nil) }
-func (v *FileActionValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.FileAction") }
+func (v *FileActionValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.file_action") }
 
 func (v *FileActionValue) Attr(name string) (starlark.Value, error) {
-	if v == nil || v.action == nil { return nil, fmt.Errorf("llb.FileAction: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil || v.action == nil { return nil, fmt.Errorf("llb.file_action: nil receiver") }
 	action := v.action
 	switch name {
 	case "Mkdir", "mkdir":
@@ -93,8 +94,8 @@ func (v *FileActionValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *FileActionValue) AttrNames() []string {
-	return []string{"Copy", "Mkdir", "Mkfile", "Rm", "Symlink", "WithState",
-		"copy", "mkdir", "mkfile", "rm", "symlink", "with_state"}
+	return SnakeCaseNames([]string{"Copy", "Mkdir", "Mkfile", "Rm", "Symlink", "WithState",
+		"copy", "mkdir", "mkfile", "rm", "symlink", "with_state"})
 }
 
 // CopyInputValue carries BuildKit's sealed CopyInput interface. A Starlark
@@ -114,11 +115,11 @@ func (v *CopyInputValue) Unwrap() buildkitllb.CopyInput {
 	return v.input
 }
 
-func (v *CopyInputValue) String() string        { return "<llb.CopyInput>" }
-func (v *CopyInputValue) Type() string          { return "llb.CopyInput" }
+func (v *CopyInputValue) String() string        { return "<llb.copy_input>" }
+func (v *CopyInputValue) Type() string          { return "llb.copy_input" }
 func (v *CopyInputValue) Freeze()               {}
 func (v *CopyInputValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.input != nil) }
-func (v *CopyInputValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.CopyInput") }
+func (v *CopyInputValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.copy_input") }
 
 func wrapCopyInput(input buildkitllb.CopyInput) starlark.Value {
 	if input == nil { return starlark.None }
@@ -141,14 +142,15 @@ func (v *FileOpValue) Unwrap() *buildkitllb.FileOp {
 	return v.op
 }
 
-func (v *FileOpValue) String() string        { return "<llb.FileOp>" }
-func (v *FileOpValue) Type() string          { return "llb.FileOp" }
+func (v *FileOpValue) String() string        { return "<llb.file_op>" }
+func (v *FileOpValue) Type() string          { return "llb.file_op" }
 func (v *FileOpValue) Freeze()               {}
 func (v *FileOpValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.op != nil) }
-func (v *FileOpValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.FileOp") }
+func (v *FileOpValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.file_op") }
 
 func (v *FileOpValue) Attr(name string) (starlark.Value, error) {
-	if v == nil || v.op == nil { return nil, fmt.Errorf("llb.FileOp: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil || v.op == nil { return nil, fmt.Errorf("llb.file_op: nil receiver") }
 	switch name {
 	case "Output", "output":
 		return boundBuiltin("FileOp.Output", func(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -184,7 +186,7 @@ func (v *FileOpValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *FileOpValue) AttrNames() []string {
-	return []string{"Inputs", "Marshal", "Output", "Validate", "inputs", "marshal", "output", "validate"}
+	return SnakeCaseNames([]string{"Inputs", "Marshal", "Output", "Validate", "inputs", "marshal", "output", "validate"})
 }
 
 func stateFileAttr(v *StateValue, name string) (starlark.Value, bool, error) {
@@ -193,7 +195,7 @@ func stateFileAttr(v *StateValue, name string) (starlark.Value, bool, error) {
 		if err := arity("State.File", args, kwargs, 1, -1); err != nil { return nil, err }
 		action, ok := args[0].(*FileActionValue)
 		if !ok || action == nil || action.action == nil {
-			return nil, fmt.Errorf("State.File: got %s, want llb.FileAction", valueType(args[0]))
+			return nil, fmt.Errorf("State.File: got %s, want llb.file_action", valueType(args[0]))
 		}
 		options, err := optionsFromArgs[buildkitllb.ConstraintsOpt](args, 1, "ConstraintsOpt")
 		if err != nil { return nil, err }
@@ -348,7 +350,7 @@ func newFileOpBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tup
 	if err := arity("NewFileOp", args, kwargs, 2, -1); err != nil { return nil, err }
 	state, err := stateFromValue(args[0]); if err != nil { return nil, err }
 	action, ok := args[1].(*FileActionValue)
-	if !ok || action == nil || action.action == nil { return nil, fmt.Errorf("NewFileOp: got %s, want llb.FileAction", valueType(args[1])) }
+	if !ok || action == nil || action.action == nil { return nil, fmt.Errorf("NewFileOp: got %s, want llb.file_action", valueType(args[1])) }
 	constraints, err := constraintsFromArgs(args[2:len(args)], 0)
 	if err != nil { return nil, err }
 	return WrapFileOp(buildkitllb.NewFileOp(state, action.action, *constraints)), nil
@@ -361,7 +363,7 @@ func copyInputFromValue(value starlark.Value) (buildkitllb.CopyInput, error) {
 	case *CopyInputValue:
 		if v != nil && v.input != nil { return v.input, nil }
 	}
-	return nil, fmt.Errorf("got %s, want llb.State or llb.CopyInput", valueType(value))
+	return nil, fmt.Errorf("got %s, want llb.state or llb.copy_input", valueType(value))
 }
 
 var (

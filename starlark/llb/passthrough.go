@@ -16,20 +16,21 @@ type PassthroughInputValue struct {
 func WrapPassthroughInput(input buildkitllb.PassthroughInput)*PassthroughInputValue{
 	return &PassthroughInputValue{input:input}
 }
-func (v *PassthroughInputValue) String()string{return "<llb.PassthroughInput>"}
-func (v *PassthroughInputValue) Type()string{return "llb.PassthroughInput"}
+func (v *PassthroughInputValue) String()string{return "<llb.passthrough_input>"}
+func (v *PassthroughInputValue) Type()string{return "llb.passthrough_input"}
 func (v *PassthroughInputValue) Freeze(){}
 func (v *PassthroughInputValue) Truth()starlark.Bool{return starlark.Bool(v!=nil)}
-func (v *PassthroughInputValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llb.PassthroughInput")}
+func (v *PassthroughInputValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llb.passthrough_input")}
 func (v *PassthroughInputValue) Attr(name string)(starlark.Value,error){
-	if v==nil{return nil,fmt.Errorf("llb.PassthroughInput: nil receiver")}
+	name = SnakeCaseIdentifier(name)
+	if v==nil{return nil,fmt.Errorf("llb.passthrough_input: nil receiver")}
 	switch name{
 	case "state","State":return WrapState(v.input.State),nil
 	case "output","Output":return starlark.Bool(v.input.Output),nil
 	default:return nil,nil
 	}
 }
-func (v *PassthroughInputValue) AttrNames()[]string{return []string{"state","output","State","Output"}}
+func (v *PassthroughInputValue) AttrNames()[]string{return SnakeCaseNames([]string{"state","output","State","Output"})}
 
 // PassthroughOpValue wraps a multi-output passthrough vertex.
 type PassthroughOpValue struct { op *buildkitllb.PassthroughOp }
@@ -37,13 +38,14 @@ type PassthroughOpValue struct { op *buildkitllb.PassthroughOp }
 // WrapPassthroughOp adapts a native PassthroughOp.
 func WrapPassthroughOp(op *buildkitllb.PassthroughOp)*PassthroughOpValue{return &PassthroughOpValue{op:op}}
 func (v *PassthroughOpValue) Unwrap()*buildkitllb.PassthroughOp{if v==nil{return nil};return v.op}
-func (v *PassthroughOpValue) String()string{return "<llb.PassthroughOp>"}
-func (v *PassthroughOpValue) Type()string{return "llb.PassthroughOp"}
+func (v *PassthroughOpValue) String()string{return "<llb.passthrough_op>"}
+func (v *PassthroughOpValue) Type()string{return "llb.passthrough_op"}
 func (v *PassthroughOpValue) Freeze(){}
 func (v *PassthroughOpValue) Truth()starlark.Bool{return starlark.Bool(v!=nil&&v.op!=nil)}
-func (v *PassthroughOpValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llb.PassthroughOp")}
+func (v *PassthroughOpValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: llb.passthrough_op")}
 func (v *PassthroughOpValue) Attr(name string)(starlark.Value,error){
-	if v==nil||v.op==nil{return nil,fmt.Errorf("llb.PassthroughOp: nil receiver")}
+	name = SnakeCaseIdentifier(name)
+	if v==nil||v.op==nil{return nil,fmt.Errorf("llb.passthrough_op: nil receiver")}
 	switch name{
 	case "Output","output":
 		return boundBuiltin("PassthroughOp.Output",func(_ *starlark.Thread,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
@@ -78,7 +80,7 @@ func (v *PassthroughOpValue) Attr(name string)(starlark.Value,error){
 	default:return nil,nil
 	}
 }
-func (v *PassthroughOpValue) AttrNames()[]string{return []string{"Output","OutputAt","Inputs","Validate","Marshal","output","output_at","inputs","validate","marshal"}}
+func (v *PassthroughOpValue) AttrNames()[]string{return SnakeCaseNames([]string{"Output","OutputAt","Inputs","Validate","Marshal","output","output_at","inputs","validate","marshal"})}
 
 func passthroughBuiltins()map[string]starlark.Value{
 	return map[string]starlark.Value{
@@ -91,7 +93,7 @@ func passthroughBuiltins()map[string]starlark.Value{
 func passthroughInputBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var stateValue starlark.Value
 	var output bool=true
-	if err:=starlark.UnpackArgs("PassthroughInput",args,kwargs,"state",&stateValue,"output?",&output);err!=nil{return nil,err}
+	if err:=UnpackArgs("PassthroughInput",args,kwargs,"state",&stateValue,"output?",&output);err!=nil{return nil,err}
 	state,err:=stateFromValue(stateValue);if err!=nil{return nil,err}
 	return WrapPassthroughInput(buildkitllb.PassthroughInput{State:state,Output:output}),nil
 }
@@ -100,7 +102,7 @@ func passthroughInputsFromValue(value starlark.Value)([]buildkitllb.PassthroughI
 	inputs:=make([]buildkitllb.PassthroughInput,list.Len())
 	for i:=range inputs{
 		item,ok:=list.Index(i).(*PassthroughInputValue)
-		if !ok||item==nil{return nil,fmt.Errorf("passthrough inputs[%d]: got %s, want llb.PassthroughInput",i,valueType(list.Index(i)))}
+		if !ok||item==nil{return nil,fmt.Errorf("passthrough inputs[%d]: got %s, want llb.passthrough_input",i,valueType(list.Index(i)))}
 		inputs[i]=item.input
 	}
 	return inputs,nil

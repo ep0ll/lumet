@@ -47,7 +47,7 @@ func (r *metaResolverCallback) ResolveSourceMetadata(ctx context.Context, op *pb
 
 func newImageMetaResolverBuiltin(thread *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var callback starlark.Callable
-	if err := starlark.UnpackArgs("NewImageMetaResolver", args, kwargs, "resolver", &callback); err != nil {
+	if err := starlarkllb.UnpackArgs("NewImageMetaResolver", args, kwargs, "resolver", &callback); err != nil {
 		return nil, err
 	}
 	resolver := buildkitsourceresolver.NewImageMetaResolver(&metaResolverCallback{
@@ -59,7 +59,7 @@ func newImageMetaResolverBuiltin(thread *starlark.Thread, _ *starlark.Builtin, a
 func metaResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var opValue starlark.Value
 	var imageValue, gitValue, httpValue starlark.Value = starlark.None, starlark.None, starlark.None
-	if err := starlark.UnpackArgs("MetaResponse", args, kwargs,
+	if err := starlarkllb.UnpackArgs("MetaResponse", args, kwargs,
 		"op", &opValue,
 		"image?", &imageValue,
 		"git?", &gitValue,
@@ -69,7 +69,7 @@ func metaResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.
 	}
 	op, ok := opValue.(*SourceOpValue)
 	if !ok || op == nil || op.op == nil {
-		return nil, fmt.Errorf("MetaResponse.op: got %s, want sourceresolver.SourceOp", starlarkType(opValue))
+		return nil, fmt.Errorf("MetaResponse.op: got %s, want sourceresolver.source_op", starlarkType(opValue))
 	}
 	response := &buildkitsourceresolver.MetaResponse{Op: op.op}
 	fields := starlark.StringDict{"op": op}
@@ -104,7 +104,7 @@ func resolveImageResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args s
 	var rawDigest string
 	var configValue starlark.Value
 	var chainValue starlark.Value = starlark.None
-	if err := starlark.UnpackArgs("ResolveImageResponse", args, kwargs,
+	if err := starlarkllb.UnpackArgs("ResolveImageResponse", args, kwargs,
 		"digest", &rawDigest,
 		"config", &configValue,
 		"attestation_chain?", &chainValue,
@@ -129,7 +129,7 @@ func resolveImageResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args s
 func resolveGitResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var checksum, ref, commitChecksum string
 	var commitObjectValue, tagObjectValue starlark.Value = starlark.None, starlark.None
-	if err := starlark.UnpackArgs("ResolveGitResponse", args, kwargs,
+	if err := starlarkllb.UnpackArgs("ResolveGitResponse", args, kwargs,
 		"checksum?", &checksum, "ref?", &ref, "commit_checksum?", &commitChecksum,
 		"commit_object?", &commitObjectValue, "tag_object?", &tagObjectValue,
 	); err != nil { return nil, err }
@@ -157,7 +157,7 @@ func resolveGitResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args sta
 func resolveHTTPResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var rawDigest, filename, modified string
 	var checksumValue starlark.Value = starlark.None
-	if err := starlark.UnpackArgs("ResolveHTTPResponse", args, kwargs,
+	if err := starlarkllb.UnpackArgs("ResolveHTTPResponse", args, kwargs,
 		"digest", &rawDigest, "filename?", &filename, "last_modified?", &modified,
 		"checksum_response?", &checksumValue,
 	); err != nil { return nil, err }
@@ -183,7 +183,7 @@ func resolveHTTPResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args st
 func resolveHTTPChecksumResponseBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var value string
 	var suffixValue starlark.Value = starlark.None
-	if err := starlark.UnpackArgs("ResolveHTTPChecksumResponse", args, kwargs, "digest", &value, "suffix?",&suffixValue); err != nil { return nil, err }
+	if err := starlarkllb.UnpackArgs("ResolveHTTPChecksumResponse", args, kwargs, "digest", &value, "suffix?",&suffixValue); err != nil { return nil, err }
 	var suffix []byte
 	if suffixValue != starlark.None {
 		var err error
@@ -198,7 +198,7 @@ func blobBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, k
 	var mediaType, rawDigest string
 	var size int64
 	var dataValue starlark.Value
-	if err := starlark.UnpackArgs("Blob", args, kwargs,
+	if err := starlarkllb.UnpackArgs("Blob", args, kwargs,
 		"media_type", &mediaType, "digest", &rawDigest, "size", &size, "data", &dataValue,
 	); err != nil { return nil, err }
 	data, err := bytesArg("Blob.data", dataValue)
@@ -219,7 +219,7 @@ func attestationChainBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlar
 	var rootRaw,imageRaw,attestationRaw string
 	var signatureValues starlark.Value=starlark.NewList(nil)
 	var blobValues starlark.Value=starlark.None
-	if err:=starlark.UnpackArgs("AttestationChain",args,kwargs,
+	if err:=starlarkllb.UnpackArgs("AttestationChain",args,kwargs,
 		"root",&rootRaw,"image_manifest",&imageRaw,"attestation_manifest",&attestationRaw,
 		"signature_manifests?",&signatureValues,"blobs?",&blobValues);err!=nil{return nil,err}
 	root,err:=digest.Parse(rootRaw);if err!=nil{return nil,err}

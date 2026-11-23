@@ -29,11 +29,11 @@ func (v *StateValue) Unwrap() buildkitllb.State {
 	return v.state
 }
 
-func (v *StateValue) String() string        { return "<llb.State>" }
-func (v *StateValue) Type() string          { return "llb.State" }
+func (v *StateValue) String() string        { return "<llb.state>" }
+func (v *StateValue) Type() string          { return "llb.state" }
 func (v *StateValue) Freeze()               {}
 func (v *StateValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *StateValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.State") }
+func (v *StateValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.state") }
 
 // OutputValue wraps the BuildKit Output interface. The interface is kept
 // private because only BuildKit implementations can safely satisfy it.
@@ -54,11 +54,11 @@ func (v *OutputValue) Unwrap() buildkitllb.Output {
 	return v.output
 }
 
-func (v *OutputValue) String() string        { return "<llb.Output>" }
-func (v *OutputValue) Type() string          { return "llb.Output" }
+func (v *OutputValue) String() string        { return "<llb.output>" }
+func (v *OutputValue) Type() string          { return "llb.output" }
 func (v *OutputValue) Freeze()               {}
 func (v *OutputValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.output != nil) }
-func (v *OutputValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.Output") }
+func (v *OutputValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.output") }
 
 // VertexValue wraps BuildKit's Vertex interface for Go-defined operations.
 type VertexValue struct {
@@ -78,11 +78,11 @@ func (v *VertexValue) Unwrap() buildkitllb.Vertex {
 	return v.vertex
 }
 
-func (v *VertexValue) String() string        { return "<llb.Vertex>" }
-func (v *VertexValue) Type() string          { return "llb.Vertex" }
+func (v *VertexValue) String() string        { return "<llb.vertex>" }
+func (v *VertexValue) Type() string          { return "llb.vertex" }
 func (v *VertexValue) Freeze()               {}
 func (v *VertexValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.vertex != nil) }
-func (v *VertexValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.Vertex") }
+func (v *VertexValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.vertex") }
 
 // ConstraintsValue wraps a BuildKit Constraints value. Its native fields
 // remain private so that option application continues to be owned by BuildKit.
@@ -103,15 +103,16 @@ func (v *ConstraintsValue) Unwrap() buildkitllb.Constraints {
 	return v.constraints
 }
 
-func (v *ConstraintsValue) String() string        { return "<llb.Constraints>" }
-func (v *ConstraintsValue) Type() string          { return "llb.Constraints" }
+func (v *ConstraintsValue) String() string        { return "<llb.constraints>" }
+func (v *ConstraintsValue) Type() string          { return "llb.constraints" }
 func (v *ConstraintsValue) Freeze()               {}
 func (v *ConstraintsValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *ConstraintsValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.Constraints") }
+func (v *ConstraintsValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.constraints") }
 
 func (v *ConstraintsValue) Attr(name string) (starlark.Value, error) {
+	name = SnakeCaseIdentifier(name)
 	if v == nil {
-		return nil, fmt.Errorf("llb.Constraints: nil receiver")
+		return nil, fmt.Errorf("llb.constraints: nil receiver")
 	}
 	switch name {
 	case "platform":
@@ -139,8 +140,8 @@ func (v *ConstraintsValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *ConstraintsValue) AttrNames() []string {
-	return []string{"has_capabilities", "local_unique_id", "metadata", "platform", "source_locations", "worker_constraints",
-		"HasCapabilities", "LocalUniqueID", "Metadata", "SourceLocations", "WorkerConstraints"}
+	return SnakeCaseNames([]string{"has_capabilities", "local_unique_id", "metadata", "platform", "source_locations", "worker_constraints",
+		"HasCapabilities", "LocalUniqueID", "Metadata", "SourceLocations", "WorkerConstraints"})
 }
 
 // OpMetadataValue wraps BuildKit's user-facing LLB OpMetadata structure.
@@ -161,15 +162,16 @@ func (v *OpMetadataValue) Unwrap() buildkitllb.OpMetadata {
 	return v.metadata
 }
 
-func (v *OpMetadataValue) String() string        { return "<llb.OpMetadata>" }
-func (v *OpMetadataValue) Type() string          { return "llb.OpMetadata" }
+func (v *OpMetadataValue) String() string        { return "<llb.op_metadata>" }
+func (v *OpMetadataValue) Type() string          { return "llb.op_metadata" }
 func (v *OpMetadataValue) Freeze()               {}
 func (v *OpMetadataValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *OpMetadataValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.OpMetadata") }
+func (v *OpMetadataValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.op_metadata") }
 
 func (v *OpMetadataValue) Attr(name string) (starlark.Value, error) {
+	name = SnakeCaseIdentifier(name)
 	if v == nil {
-		return nil, fmt.Errorf("llb.OpMetadata: nil receiver")
+		return nil, fmt.Errorf("llb.op_metadata: nil receiver")
 	}
 	switch name {
 	case "ToPB", "to_pb":
@@ -182,7 +184,7 @@ func (v *OpMetadataValue) Attr(name string) (starlark.Value, error) {
 			if err := arity("OpMetadata.FromPB", args, kwargs, 1, 1); err != nil { return nil, err }
 			protoValue, ok := args[0].(*OpMetadataProtoValue)
 			if !ok || protoValue == nil || protoValue.metadata == nil {
-				return nil, fmt.Errorf("OpMetadata.FromPB: got %s, want llb.OpMetadataPB", valueType(args[0]))
+				return nil, fmt.Errorf("OpMetadata.FromPB: got %s, want llb.op_metadata_pb", valueType(args[0]))
 			}
 			metadata := buildkitllb.OpMetadata{}
 			metadata.FromPB(protoValue.metadata)
@@ -207,7 +209,7 @@ func (v *OpMetadataValue) Attr(name string) (starlark.Value, error) {
 		if v.metadata.ProgressGroup == nil {
 			return starlark.None, nil
 		}
-		return starlarkstructValue("llb.ProgressGroup", starlark.StringDict{
+		return starlarkstructValue("llb.progress_group", starlark.StringDict{
 			"id":   starlark.String(v.metadata.ProgressGroup.Id),
 			"name": starlark.String(v.metadata.ProgressGroup.Name),
 			"weak": starlark.Bool(v.metadata.ProgressGroup.Weak),
@@ -216,7 +218,7 @@ func (v *OpMetadataValue) Attr(name string) (starlark.Value, error) {
 		if v.metadata.LinuxResources == nil {
 			return starlark.None, nil
 		}
-		return starlarkstructValue("llb.LinuxResources", starlark.StringDict{
+		return starlarkstructValue("llb.linux_resources", starlark.StringDict{
 			"memory":      starlark.MakeInt64(v.metadata.LinuxResources.Memory),
 			"memory_swap": starlark.MakeInt64(v.metadata.LinuxResources.MemorySwap),
 			"cpu_shares":  starlark.MakeUint64(v.metadata.LinuxResources.CpuShares),
@@ -231,10 +233,10 @@ func (v *OpMetadataValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *OpMetadataValue) AttrNames() []string {
-	return []string{
+	return SnakeCaseNames([]string{
 		"Caps", "Description", "ExportCache", "IgnoreCache", "LinuxResources", "ProgressGroup", "ToPB", "FromPB",
 		"caps", "description", "export_cache", "ignore_cache", "linux_resources", "progress_group", "to_pb", "from_pb",
-	}
+	})
 }
 
 // OCIPlatformValue carries a normalized OCI platform for State.Platform.
@@ -257,18 +259,19 @@ func (v *OCIPlatformValue) Unwrap() ocispecs.Platform {
 
 func (v *OCIPlatformValue) String() string {
 	if v == nil {
-		return "<llb.OCIPlatform nil>"
+		return "<llb.oci_platform nil>"
 	}
-	return fmt.Sprintf("<llb.OCIPlatform %s/%s>", v.platform.OS, v.platform.Architecture)
+	return fmt.Sprintf("<llb.oci_platform %s/%s>", v.platform.OS, v.platform.Architecture)
 }
-func (v *OCIPlatformValue) Type() string          { return "llb.OCIPlatform" }
+func (v *OCIPlatformValue) Type() string          { return "llb.oci_platform" }
 func (v *OCIPlatformValue) Freeze()               {}
 func (v *OCIPlatformValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *OCIPlatformValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.OCIPlatform") }
+func (v *OCIPlatformValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.oci_platform") }
 
 func (v *OCIPlatformValue) Attr(name string) (starlark.Value, error) {
+	name = SnakeCaseIdentifier(name)
 	if v == nil {
-		return nil, fmt.Errorf("llb.OCIPlatform: nil receiver")
+		return nil, fmt.Errorf("llb.oci_platform: nil receiver")
 	}
 	switch name {
 	case "os", "OS":
@@ -287,8 +290,8 @@ func (v *OCIPlatformValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *OCIPlatformValue) AttrNames() []string {
-	return []string{"architecture", "os", "os_features", "os_version", "variant",
-		"Architecture", "OS", "OSFeatures", "OSVersion", "Variant"}
+	return SnakeCaseNames([]string{"architecture", "os", "os_features", "os_version", "variant",
+		"Architecture", "OS", "OSFeatures", "OSVersion", "Variant"})
 }
 
 func stringDictValue(values map[string]string) starlark.Value {
@@ -300,12 +303,17 @@ func stringDictValue(values map[string]string) starlark.Value {
 }
 
 func starlarkstructValue(name string, values starlark.StringDict) starlark.Value {
-	return starlarkstruct.FromStringDict(starlark.String(name), values)
+	normalized, err := NormalizeMembers(values)
+	if err != nil {
+		panic(err)
+	}
+	return starlarkstruct.FromStringDict(starlark.String(name), normalized)
 }
 
 func (v *StateValue) Attr(name string) (starlark.Value, error) {
+	name = SnakeCaseIdentifier(name)
 	if v == nil {
-		return nil, fmt.Errorf("llb.State: nil receiver")
+		return nil, fmt.Errorf("llb.state: nil receiver")
 	}
 	switch name {
 	case "WithValue", "with_value":
@@ -356,7 +364,7 @@ func (v *StateValue) Attr(name string) (starlark.Value, error) {
 			}
 			output, ok := args[0].(*OutputValue)
 			if !ok || output == nil {
-				return nil, fmt.Errorf("State.WithOutput: got %s, want llb.Output", valueType(args[0]))
+				return nil, fmt.Errorf("State.WithOutput: got %s, want llb.output", valueType(args[0]))
 			}
 			return WrapState(v.state.WithOutput(output.output)), nil
 		}), nil
@@ -394,7 +402,7 @@ func (v *StateValue) AttrNames() []string {
 		names = append(names, provider...)
 	}
 	sort.Strings(names)
-	return compactStrings(names)
+	return SnakeCaseNames(compactStrings(names))
 }
 
 var stateAttrProviders = []func(*StateValue, string) (starlark.Value, bool, error){
@@ -523,7 +531,7 @@ func newStateBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tupl
 	}
 	output, ok := args[0].(*OutputValue)
 	if !ok || output == nil {
-		return nil, fmt.Errorf("NewState: got %s, want llb.Output", valueType(args[0]))
+		return nil, fmt.Errorf("NewState: got %s, want llb.output", valueType(args[0]))
 	}
 	return WrapState(buildkitllb.NewState(output.output)), nil
 }
@@ -541,7 +549,7 @@ func newConstraintsBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlar
 
 func ociPlatformBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var platform ocispecs.Platform
-	if err := starlark.UnpackArgs("OCIPlatform", args, kwargs,
+	if err := UnpackArgs("OCIPlatform", args, kwargs,
 		"os", &platform.OS,
 		"architecture", &platform.Architecture,
 		"variant?", &platform.Variant,
@@ -576,8 +584,9 @@ func stateConstraintValues() map[string]starlark.Value {
 }
 
 func (v *OutputValue) Attr(name string) (starlark.Value, error) {
+	name = SnakeCaseIdentifier(name)
 	if v == nil || v.output == nil {
-		return nil, fmt.Errorf("llb.Output: nil receiver")
+		return nil, fmt.Errorf("llb.output: nil receiver")
 	}
 	switch name {
 	case "Vertex", "vertex":
@@ -595,7 +604,7 @@ func (v *OutputValue) Attr(name string) (starlark.Value, error) {
 			input, err := v.output.ToInput(callContext(thread), constraints)
 			if err != nil { return nil, err }
 			if input == nil { return starlark.None, nil }
-			return starlarkstructValue("llb.Input", starlark.StringDict{
+			return starlarkstructValue("llb.input", starlark.StringDict{
 				"digest": starlark.String(input.Digest),
 				"index": starlark.MakeInt64(input.Index),
 			}), nil
@@ -606,12 +615,13 @@ func (v *OutputValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *OutputValue) AttrNames() []string {
-	return []string{"Vertex", "ToInput", "vertex", "to_input"}
+	return SnakeCaseNames([]string{"Vertex", "ToInput", "vertex", "to_input"})
 }
 
 func (v *VertexValue) Attr(name string) (starlark.Value, error) {
+	name = SnakeCaseIdentifier(name)
 	if v == nil || v.vertex == nil {
-		return nil, fmt.Errorf("llb.Vertex: nil receiver")
+		return nil, fmt.Errorf("llb.vertex: nil receiver")
 	}
 	switch name {
 	case "Output", "output":
@@ -649,7 +659,7 @@ func (v *VertexValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *VertexValue) AttrNames() []string {
-	return []string{"Output", "Inputs", "Validate", "Marshal", "output", "inputs", "validate", "marshal"}
+	return SnakeCaseNames([]string{"Output", "Inputs", "Validate", "Marshal", "output", "inputs", "validate", "marshal"})
 }
 
 var (
@@ -702,11 +712,11 @@ func withLinuxResourcesBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args sta
 	var resources buildkitllb.LinuxResources
 	if len(args) == 1 && len(kwargs) == 0 {
 		value, ok := args[0].(*LinuxResourcesValue)
-		if !ok || value == nil { return nil, fmt.Errorf("WithLinuxResources: got %s, want llb.LinuxResources", valueType(args[0])) }
+		if !ok || value == nil { return nil, fmt.Errorf("WithLinuxResources: got %s, want llb.linux_resources", valueType(args[0])) }
 		resources = value.resources
 	} else {
-		if len(args) != 0 { return nil, fmt.Errorf("WithLinuxResources: use either one llb.LinuxResources value or named fields") }
-		if err := starlark.UnpackArgs("WithLinuxResources", args, kwargs,
+		if len(args) != 0 { return nil, fmt.Errorf("WithLinuxResources: use either one llb.linux_resources value or named fields") }
+		if err := UnpackArgs("WithLinuxResources", args, kwargs,
 			"memory?", &resources.Memory,
 			"memory_swap?", &resources.MemorySwap,
 			"cpu_shares?", &resources.CPUShares,
@@ -721,7 +731,7 @@ func withLinuxResourcesBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args sta
 
 func platformConstraintBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var platform ocispecs.Platform
-	if err := starlark.UnpackArgs("Platform", args, kwargs,
+	if err := UnpackArgs("Platform", args, kwargs,
 		"os", &platform.OS,
 		"architecture", &platform.Architecture,
 		"variant?", &platform.Variant,
@@ -767,23 +777,23 @@ type CapSetValue struct { capSet apicaps.CapSet }
 // WrapCapSet adapts a BuildKit API capability set.
 func WrapCapSet(capSet apicaps.CapSet) *CapSetValue { return &CapSetValue{capSet: capSet} }
 
-func (v *CapSetValue) String() string        { return "<llb.CapSet>" }
-func (v *CapSetValue) Type() string          { return "llb.CapSet" }
+func (v *CapSetValue) String() string        { return "<llb.cap_set>" }
+func (v *CapSetValue) Type() string          { return "llb.cap_set" }
 func (v *CapSetValue) Freeze()               {}
 func (v *CapSetValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *CapSetValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.CapSet") }
+func (v *CapSetValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.cap_set") }
 
 func withCapsBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	if err := arity("WithCaps", args, kwargs, 1, 1); err != nil { return nil, err }
 	caps, ok := args[0].(*CapSetValue)
-	if !ok || caps == nil { return nil, fmt.Errorf("WithCaps: got %s, want llb.CapSet", valueType(args[0])) }
+	if !ok || caps == nil { return nil, fmt.Errorf("WithCaps: got %s, want llb.cap_set", valueType(args[0])) }
 	return wrapOption("ConstraintsOpt", buildkitllb.WithCaps(caps.capSet)), nil
 }
 
 func opMetadataBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var metadata buildkitllb.OpMetadata
 	var description starlark.Value
-	if err := starlark.UnpackArgs("OpMetadata", args, kwargs,
+	if err := UnpackArgs("OpMetadata", args, kwargs,
 		"ignore_cache?", &metadata.IgnoreCache,
 		"description?", &description,
 	); err != nil { return nil, err }

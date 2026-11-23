@@ -4,6 +4,7 @@ package sourceresolver
 
 import (
 	"fmt"
+	"sort"
 	starlarkllb "github.com/ep0ll/lumet/starlark/llb"
 	buildkitsourceresolver "github.com/moby/buildkit/client/llb/sourceresolver"
 	"github.com/moby/buildkit/solver/pb"
@@ -11,7 +12,6 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.starlark.net/starlark"
-	"go.starlark.net/starlarkstruct"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -24,21 +24,29 @@ type recordValue struct {
 }
 
 func newRecord(name string, native any, fields starlark.StringDict) *recordValue {
-	return &recordValue{name: name, native: native, fields: fields}
+	normalized, err := starlarkllb.NormalizeMembers(fields)
+	if err != nil {
+		panic(err)
+	}
+	return &recordValue{name: name, native: native, fields: normalized}
 }
-func (v *recordValue) String() string { return "<sourceresolver." + v.name + ">" }
-func (v *recordValue) Type() string { return "sourceresolver." + v.name }
+func (v *recordValue) String() string { return "<sourceresolver." + starlarkllb.SnakeCaseIdentifier(v.name) + ">" }
+func (v *recordValue) Type() string { return "sourceresolver." + starlarkllb.SnakeCaseIdentifier(v.name) }
 func (v *recordValue) Freeze() { v.fields.Freeze() }
 func (v *recordValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
 func (v *recordValue) Hash() (uint32,error) { return 0, fmt.Errorf("unhashable: sourceresolver.%s", v.name) }
 func (v *recordValue) Attr(name string) (starlark.Value,error) {
+	name = starlarkllb.SnakeCaseIdentifier(name)
 	if v == nil { return nil, fmt.Errorf("sourceresolver: nil %s", name) }
 	if value, ok := v.fields[name]; ok { return value,nil }
 	return nil,nil
 }
 func (v *recordValue) AttrNames() []string {
-	names := make([]string,0,len(v.fields))
-	for name := range v.fields { names = append(names,name) }
+	names := make([]string, 0, len(v.fields))
+	for name := range v.fields {
+		names = append(names, name)
+	}
+	sort.Strings(names)
 	return names
 }
 
@@ -84,7 +92,7 @@ func bytesArg(name string, value starlark.Value) ([]byte,error) {
 func platformArg(name string, value starlark.Value) (*ocispecs.Platform,error) {
 	if value==starlark.None { return nil,nil }
 	v,ok:=value.(*starlarkllb.OCIPlatformValue)
-	if !ok || v==nil { return nil,fmt.Errorf("%s: got %s, want llb.OCIPlatform or None",name,starlarkType(value)) }
+	if !ok || v==nil { return nil,fmt.Errorf("%s: got %s, want llb.oci_platform or None",name,starlarkType(value)) }
 	p:=v.Unwrap()
 	return &p,nil
 }
@@ -92,7 +100,7 @@ func platformArg(name string, value starlark.Value) (*ocispecs.Platform,error) {
 func sourceOpBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error) {
 	var identifier string
 	var attrsValue starlark.Value = starlark.None
-	if err:=starlark.UnpackArgs("SourceOp",args,kwargs,"identifier",&identifier,"attrs?",&attrsValue); err!=nil { return nil,err }
+	if err:=starlarkllb.UnpackArgs("SourceOp",args,kwargs,"identifier",&identifier,"attrs?",&attrsValue); err!=nil { return nil,err }
 	attrs:=map[string]string{}
 	if attrsValue!=starlark.None {
 		dict,ok:=attrsValue.(*starlark.Dict)
@@ -108,13 +116,14 @@ func sourceOpBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,
 
 // SourceOpValue wraps solver/pb.SourceOp, not client/llb.SourceOp.
 type SourceOpValue struct { op *pb.SourceOp }
-func (v *SourceOpValue) String() string { return "<sourceresolver.SourceOp>" }
-func (v *SourceOpValue) Type() string { return "sourceresolver.SourceOp" }
+func (v *SourceOpValue) String() string { return "<sourceresolver.source_op>" }
+func (v *SourceOpValue) Type() string { return "sourceresolver.source_op" }
 func (v *SourceOpValue) Freeze() {}
 func (v *SourceOpValue) Truth() starlark.Bool { return starlark.Bool(v!=nil && v.op!=nil) }
-func (v *SourceOpValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: sourceresolver.SourceOp")}
+func (v *SourceOpValue) Hash()(uint32,error){return 0,fmt.Errorf("unhashable: sourceresolver.source_op")}
 func (v *SourceOpValue) Attr(name string)(starlark.Value,error){
-	if v==nil||v.op==nil{return nil,fmt.Errorf("sourceresolver.SourceOp: nil receiver")}
+	name = starlarkllb.SnakeCaseIdentifier(name)
+	if v==nil||v.op==nil{return nil,fmt.Errorf("sourceresolver.source_op: nil receiver")}
 	switch name {
 	case "identifier","Identifier":return starlark.String(v.op.Identifier),nil
 	case "attrs","Attrs":
@@ -124,7 +133,7 @@ func (v *SourceOpValue) Attr(name string)(starlark.Value,error){
 	default:return nil,nil
 	}
 }
-func (v *SourceOpValue) AttrNames()[]string{return []string{"identifier","attrs","Identifier","Attrs"}}
+func (v *SourceOpValue) AttrNames()[]string{return starlarkllb.SnakeCaseNames([]string{"identifier","attrs","Identifier","Attrs"})}
 func (v *SourceOpValue) Unwrap()*pb.SourceOp { if v==nil{return nil};return v.op }
 
 func optBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
@@ -132,7 +141,7 @@ func optBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwarg
 	var opt buildkitsourceresolver.Opt
 	for _,kw:=range kwargs{
 		key,ok:=kw[0].(starlark.String);if !ok{return nil,fmt.Errorf("Opt: field names must be strings")}
-		switch string(key){
+		switch starlarkllb.SnakeCaseIdentifier(string(key)){
 		case "log_name":
 			value,err:=stringArg("Opt.log_name",kw[1]);if err!=nil{return nil,err};opt.LogName=value
 		case "image":
@@ -167,7 +176,7 @@ func resolveImageOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark
 	var resolveMode string
 	var noConfig,attestationChain bool
 	var attestations []string
-	if err:=starlark.UnpackArgs("ResolveImageOpt",args,kwargs,
+	if err:=starlarkllb.UnpackArgs("ResolveImageOpt",args,kwargs,
 		"platform?",&platformValue,"resolve_mode?",&resolveMode,"no_config?",&noConfig,
 		"attestation_chain?",&attestationChain,"resolve_attestations?",&attestations);err!=nil{return nil,err}
 	platform,err:=platformArg("ResolveImageOpt.platform",platformValue);if err!=nil{return nil,err}
@@ -179,13 +188,13 @@ func resolveImageOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark
 }
 func resolveGitOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var returnObject bool
-	if err:=starlark.UnpackArgs("ResolveGitOpt",args,kwargs,"return_object?",&returnObject);err!=nil{return nil,err}
+	if err:=starlarkllb.UnpackArgs("ResolveGitOpt",args,kwargs,"return_object?",&returnObject);err!=nil{return nil,err}
 	opt:=buildkitsourceresolver.ResolveGitOpt{ReturnObject:returnObject}
 	return newRecord("ResolveGitOpt",opt,starlark.StringDict{"return_object":boolField(returnObject)}),nil
 }
 func resolveHTTPOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var requestValue starlark.Value=starlark.None
-	if err:=starlark.UnpackArgs("ResolveHTTPOpt",args,kwargs,"checksum_req?",&requestValue);err!=nil{return nil,err}
+	if err:=starlarkllb.UnpackArgs("ResolveHTTPOpt",args,kwargs,"checksum_req?",&requestValue);err!=nil{return nil,err}
 	var request *buildkitsourceresolver.ResolveHTTPChecksumRequest
 	if requestValue!=starlark.None{
 		v,err:=recordFrom[buildkitsourceresolver.ResolveHTTPChecksumRequest](requestValue,"ResolveHTTPChecksumRequest");if err!=nil{return nil,err}
@@ -198,7 +207,7 @@ func resolveHTTPOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.
 func resolveOCILayoutOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var platformValue starlark.Value=starlark.None
 	var storeValue starlark.Value=starlark.None
-	if err:=starlark.UnpackArgs("ResolveOCILayoutOpt",args,kwargs,"platform?",&platformValue,"store?",&storeValue);err!=nil{return nil,err}
+	if err:=starlarkllb.UnpackArgs("ResolveOCILayoutOpt",args,kwargs,"platform?",&platformValue,"store?",&storeValue);err!=nil{return nil,err}
 	platform,err:=platformArg("ResolveOCILayoutOpt.platform",platformValue);if err!=nil{return nil,err}
 	var store buildkitsourceresolver.ResolveImageConfigOptStore
 	if storeValue!=starlark.None{
@@ -210,14 +219,14 @@ func resolveOCILayoutOptBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args star
 }
 func resolveImageConfigStoreBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var sessionID,storeID string
-	if err:=starlark.UnpackArgs("ResolveImageConfigOptStore",args,kwargs,"session_id?",&sessionID,"store_id?",&storeID);err!=nil{return nil,err}
+	if err:=starlarkllb.UnpackArgs("ResolveImageConfigOptStore",args,kwargs,"session_id?",&sessionID,"store_id?",&storeID);err!=nil{return nil,err}
 	store:=buildkitsourceresolver.ResolveImageConfigOptStore{SessionID:sessionID,StoreID:storeID}
 	return newRecord("ResolveImageConfigOptStore",store,starlark.StringDict{"session_id":stringField("session_id",sessionID),"store_id":stringField("store_id",storeID)}),nil
 }
 func resolveHTTPChecksumRequestBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var algo int
 	var suffixValue starlark.Value = starlark.None
-	if err := starlark.UnpackArgs("ResolveHTTPChecksumRequest", args, kwargs,
+	if err := starlarkllb.UnpackArgs("ResolveHTTPChecksumRequest", args, kwargs,
 		"algo?", &algo, "suffix?", &suffixValue,
 	); err != nil {
 		return nil, err
@@ -263,37 +272,22 @@ func sourceResolverTypesBuiltins()map[string]starlark.Value{
 	}
 }
 
-func newModule() *starlarkstruct.Module {
-	members:=builtins()
-	for name,value:=range resolverTypeValues(){members[name]=value}
-	for name,value:=range checksumAlgoValues(){members[name]=value}
-	module:=&starlarkstruct.Module{Name:"sourceresolver",Members:members}
-	module.Freeze()
-	return module
-}
-
-// Module is the frozen Starlark module for BuildKit's sourceresolver API.
-var Module=newModule()
-
-// Load resolves the sourceresolver submodule.
-func Load(_ *starlark.Thread,name string)(starlark.StringDict,error){
-	switch name {
-	case "llb/sourceresolver","llb/sourceresolver.star","sourceresolver","sourceresolver.star":
-		return Module.Members,nil
-	default:
-		return nil,fmt.Errorf("sourceresolver: unknown module %q",name)
+// Members returns the Starlark globals exported by BuildKit's
+// sourceresolver package. Module construction and registration live in
+// github.com/ep0ll/lumet/starlark/modules.
+func Members() starlark.StringDict {
+	members := builtins()
+	for name, value := range resolverTypeValues() {
+		members[name] = value
 	}
-}
-
-func init(){
-	if err:=starlarkllb.RegisterModule("llb/sourceresolver",Module.Members);err!=nil{
-		panic(err)
+	for name, value := range checksumAlgoValues() {
+		members[name] = value
 	}
+	return starlark.StringDict(members)
 }
-
 
 // builtin is the package-local Starlark builtin constructor shared by the
 // sourceresolver module files.
 func builtin(name string, fn func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error)) *starlark.Builtin {
-	return starlark.NewBuiltin(name, fn)
+	return starlark.NewBuiltin(starlarkllb.SnakeCaseIdentifier(name), fn)
 }

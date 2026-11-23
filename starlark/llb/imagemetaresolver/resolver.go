@@ -9,61 +9,41 @@ import (
 	buildkitresolver "github.com/moby/buildkit/client/llb/imagemetaresolver"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.starlark.net/starlark"
-	"go.starlark.net/starlarkstruct"
 )
 
 type imageMetaResolverOptionValue struct {
 	option buildkitresolver.ImageMetaResolverOpt
 }
 
-func (v *imageMetaResolverOptionValue) String() string { return "<imagemetaresolver.ImageMetaResolverOpt>" }
-func (v *imageMetaResolverOptionValue) Type() string { return "imagemetaresolver.ImageMetaResolverOpt" }
+func (v *imageMetaResolverOptionValue) String() string { return "<imagemetaresolver.image_meta_resolver_opt>" }
+func (v *imageMetaResolverOptionValue) Type() string { return "imagemetaresolver.image_meta_resolver_opt" }
 func (v *imageMetaResolverOptionValue) Freeze() {}
 func (v *imageMetaResolverOptionValue) Truth() starlark.Bool { return starlark.Bool(v != nil) }
 func (v *imageMetaResolverOptionValue) Hash() (uint32,error) {
-	return 0,fmt.Errorf("unhashable: imagemetaresolver.ImageMetaResolverOpt")
+	return 0,fmt.Errorf("unhashable: imagemetaresolver.image_meta_resolver_opt")
 }
 
-func newModule() *starlarkstruct.Module {
-	members:=starlark.StringDict{
-		"WithDefault":starlarkllb.WrapOption(buildkitresolver.WithDefault),
-		"WithDefaultPlatform":starlark.NewBuiltin("WithDefaultPlatform",withDefaultPlatformBuiltin),
-		"New":starlark.NewBuiltin("New",newResolverBuiltin),
-		"Default":starlark.NewBuiltin("Default",defaultResolverBuiltin),
-	}
-	module:=&starlarkstruct.Module{Name:"imagemetaresolver",Members:members}
-	module.Freeze()
-	return module
-}
-
-// Module is the frozen Starlark module for BuildKit's imagemetaresolver package.
-var Module=newModule()
-
-func Load(_ *starlark.Thread,name string)(starlark.StringDict,error){
-	switch name{
-	case "llb/imagemetaresolver","llb/imagemetaresolver.star","imagemetaresolver","imagemetaresolver.star":
-		return Module.Members,nil
-	default:
-		return nil,fmt.Errorf("imagemetaresolver: unknown module %q",name)
-	}
-}
-
-func init(){
-	if err:=starlarkllb.RegisterModule("llb/imagemetaresolver",Module.Members);err!=nil{
-		panic(err)
+// Members returns this subpackage's Starlark globals. Centralized
+// construction, freezing and registration are owned by starlark/modules.
+func Members() starlark.StringDict {
+	return starlark.StringDict{
+		"with_default":          starlarkllb.WrapOption(buildkitresolver.WithDefault),
+		"with_default_platform": starlark.NewBuiltin("with_default_platform", withDefaultPlatformBuiltin),
+		"new":                   starlark.NewBuiltin("new", newResolverBuiltin),
+		"default":               starlark.NewBuiltin("default", defaultResolverBuiltin),
 	}
 }
 
 func withDefaultPlatformBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tuple,kwargs []starlark.Tuple)(starlark.Value,error){
 	var platformValue starlark.Value=starlark.None
-	if err:=starlark.UnpackArgs("WithDefaultPlatform",args,kwargs,"platform",&platformValue);err!=nil{
+	if err:=starlarkllb.UnpackArgs("WithDefaultPlatform",args,kwargs,"platform",&platformValue);err!=nil{
 		return nil,err
 	}
 	var platform *ocispecs.Platform
 	if platformValue!=starlark.None{
 		value,ok:=platformValue.(*starlarkllb.OCIPlatformValue)
 		if !ok || value==nil{
-			return nil,fmt.Errorf("WithDefaultPlatform: got %s, want llb.OCIPlatform or None",platformValue.Type())
+			return nil,fmt.Errorf("WithDefaultPlatform: got %s, want llb.oci_platform or None",platformValue.Type())
 		}
 		p:=value.Unwrap()
 		platform=&p
@@ -77,7 +57,7 @@ func newResolverBuiltin(_ *starlark.Thread,_ *starlark.Builtin,args starlark.Tup
 	for i,arg:=range args{
 		value,ok:=arg.(*imageMetaResolverOptionValue)
 		if !ok || value==nil{
-			return nil,fmt.Errorf("New: argument %d: got %s, want imagemetaresolver.ImageMetaResolverOpt",i+1,arg.Type())
+			return nil,fmt.Errorf("New: argument %d: got %s, want imagemetaresolver.image_meta_resolver_opt",i+1,arg.Type())
 		}
 		options[i]=value.option
 	}

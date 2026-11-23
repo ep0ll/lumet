@@ -26,15 +26,16 @@ func (v *ExecStateValue) Unwrap() buildkitllb.ExecState {
 	return v.execState
 }
 
-func (v *ExecStateValue) String() string        { return "<llb.ExecState>" }
-func (v *ExecStateValue) Type() string          { return "llb.ExecState" }
+func (v *ExecStateValue) String() string        { return "<llb.exec_state>" }
+func (v *ExecStateValue) Type() string          { return "llb.exec_state" }
 func (v *ExecStateValue) Freeze()               {}
 func (v *ExecStateValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *ExecStateValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.ExecState") }
+func (v *ExecStateValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.exec_state") }
 
 func (v *ExecStateValue) Attr(name string) (starlark.Value, error) {
+	name = SnakeCaseIdentifier(name)
 	if v == nil {
-		return nil, fmt.Errorf("llb.ExecState: nil receiver")
+		return nil, fmt.Errorf("llb.exec_state: nil receiver")
 	}
 	switch name {
 	case "Root", "root":
@@ -65,7 +66,7 @@ func (v *ExecStateValue) Attr(name string) (starlark.Value, error) {
 func (v *ExecStateValue) AttrNames() []string {
 	names := []string{"AddMount", "GetMount", "Root", "add_mount", "get_mount", "root"}
 	names = append(names, WrapState(v.execState.State).AttrNames()...)
-	return compactStrings(names)
+	return SnakeCaseNames(compactStrings(names))
 }
 
 // ExecOpValue wraps BuildKit's ExecOp vertex and its mount operations.
@@ -86,15 +87,16 @@ func (v *ExecOpValue) Unwrap() *buildkitllb.ExecOp {
 	return v.exec
 }
 
-func (v *ExecOpValue) String() string        { return "<llb.ExecOp>" }
-func (v *ExecOpValue) Type() string          { return "llb.ExecOp" }
+func (v *ExecOpValue) String() string        { return "<llb.exec_op>" }
+func (v *ExecOpValue) Type() string          { return "llb.exec_op" }
 func (v *ExecOpValue) Freeze()               {}
 func (v *ExecOpValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.exec != nil) }
-func (v *ExecOpValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.ExecOp") }
+func (v *ExecOpValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.exec_op") }
 
 func (v *ExecOpValue) Attr(name string) (starlark.Value, error) {
+	name = SnakeCaseIdentifier(name)
 	if v == nil || v.exec == nil {
-		return nil, fmt.Errorf("llb.ExecOp: nil receiver")
+		return nil, fmt.Errorf("llb.exec_op: nil receiver")
 	}
 	switch name {
 	case "AddMount", "add_mount":
@@ -148,8 +150,8 @@ func (v *ExecOpValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *ExecOpValue) AttrNames() []string {
-	return []string{"AddMount", "GetMount", "Inputs", "Marshal", "Output", "Validate",
-		"add_mount", "get_mount", "inputs", "marshal", "output", "validate"}
+	return SnakeCaseNames([]string{"AddMount", "GetMount", "Inputs", "Marshal", "Output", "Validate",
+		"add_mount", "get_mount", "inputs", "marshal", "output", "validate"})
 }
 
 // ProxyEnvValue adapts the proxy environment copied into an ExecOp.
@@ -168,14 +170,15 @@ func (v *ProxyEnvValue) Unwrap() buildkitllb.ProxyEnv {
 	return v.proxy
 }
 
-func (v *ProxyEnvValue) String() string        { return "<llb.ProxyEnv>" }
-func (v *ProxyEnvValue) Type() string          { return "llb.ProxyEnv" }
+func (v *ProxyEnvValue) String() string        { return "<llb.proxy_env>" }
+func (v *ProxyEnvValue) Type() string          { return "llb.proxy_env" }
 func (v *ProxyEnvValue) Freeze()               {}
 func (v *ProxyEnvValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *ProxyEnvValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.ProxyEnv") }
+func (v *ProxyEnvValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.proxy_env") }
 
 func (v *ProxyEnvValue) Attr(name string) (starlark.Value, error) {
-	if v == nil { return nil, fmt.Errorf("llb.ProxyEnv: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil { return nil, fmt.Errorf("llb.proxy_env: nil receiver") }
 	switch name {
 	case "HTTPProxy", "http_proxy": return starlark.String(v.proxy.HTTPProxy), nil
 	case "HTTPSProxy", "https_proxy": return starlark.String(v.proxy.HTTPSProxy), nil
@@ -187,8 +190,8 @@ func (v *ProxyEnvValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *ProxyEnvValue) AttrNames() []string {
-	return []string{"AllProxy", "FTPProxy", "HTTPProxy", "HTTPSProxy", "NoProxy",
-		"all_proxy", "ftp_proxy", "http_proxy", "https_proxy", "no_proxy"}
+	return SnakeCaseNames([]string{"AllProxy", "FTPProxy", "HTTPProxy", "HTTPSProxy", "NoProxy",
+		"all_proxy", "ftp_proxy", "http_proxy", "https_proxy", "no_proxy"})
 }
 
 // ExecInfoValue exposes the resolved RunOption configuration for inspection.
@@ -207,14 +210,15 @@ func (v *ExecInfoValue) Unwrap() *buildkitllb.ExecInfo {
 	return v.info
 }
 
-func (v *ExecInfoValue) String() string        { return "<llb.ExecInfo>" }
-func (v *ExecInfoValue) Type() string          { return "llb.ExecInfo" }
+func (v *ExecInfoValue) String() string        { return "<llb.exec_info>" }
+func (v *ExecInfoValue) Type() string          { return "llb.exec_info" }
 func (v *ExecInfoValue) Freeze()               {}
 func (v *ExecInfoValue) Truth() starlark.Bool  { return starlark.Bool(v != nil && v.info != nil) }
-func (v *ExecInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.ExecInfo") }
+func (v *ExecInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.exec_info") }
 
 func (v *ExecInfoValue) Attr(name string) (starlark.Value, error) {
-	if v == nil || v.info == nil { return nil, fmt.Errorf("llb.ExecInfo: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil || v.info == nil { return nil, fmt.Errorf("llb.exec_info: nil receiver") }
 	switch name {
 	case "state", "State":
 		return WrapState(v.info.State), nil
@@ -247,19 +251,20 @@ func (v *ExecInfoValue) Attr(name string) (starlark.Value, error) {
 }
 
 func (v *ExecInfoValue) AttrNames() []string {
-	return []string{"state", "mounts", "readonly_root_fs", "proxy_env", "secrets", "ssh", "cdi_devices", "constraints",
-		"State", "Mounts", "ReadonlyRootFS", "ProxyEnv", "Secrets", "SSH", "CDIDevices", "Constraints"}
+	return SnakeCaseNames([]string{"state", "mounts", "readonly_root_fs", "proxy_env", "secrets", "ssh", "cdi_devices", "constraints",
+		"State", "Mounts", "ReadonlyRootFS", "ProxyEnv", "Secrets", "SSH", "CDIDevices", "Constraints"})
 }
 
 type mountInfoValue struct{ info buildkitllb.MountInfo }
 
-func (v *mountInfoValue) String() string        { return "<llb.MountInfo>" }
-func (v *mountInfoValue) Type() string          { return "llb.MountInfo" }
+func (v *mountInfoValue) String() string        { return "<llb.mount_info>" }
+func (v *mountInfoValue) Type() string          { return "llb.mount_info" }
 func (v *mountInfoValue) Freeze()               {}
 func (v *mountInfoValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *mountInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.MountInfo") }
+func (v *mountInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.mount_info") }
 func (v *mountInfoValue) Attr(name string) (starlark.Value, error) {
-	if v == nil { return nil, fmt.Errorf("llb.MountInfo: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil { return nil, fmt.Errorf("llb.mount_info: nil receiver") }
 	switch name {
 	case "target", "Target": return starlark.String(v.info.Target), nil
 	case "source", "Source": return WrapOutput(v.info.Source), nil
@@ -267,29 +272,31 @@ func (v *mountInfoValue) Attr(name string) (starlark.Value, error) {
 	default: return nil, nil
 	}
 }
-func (v *mountInfoValue) AttrNames() []string { return []string{"target", "source", "options", "Target", "Source", "Opts"} }
+func (v *mountInfoValue) AttrNames() []string { return SnakeCaseNames([]string{"target", "source", "options", "Target", "Source", "Opts"}) }
 
 type cdiDeviceInfoValue struct{ info buildkitllb.CDIDeviceInfo }
-func (v *cdiDeviceInfoValue) String() string        { return "<llb.CDIDeviceInfo>" }
-func (v *cdiDeviceInfoValue) Type() string          { return "llb.CDIDeviceInfo" }
+func (v *cdiDeviceInfoValue) String() string        { return "<llb.cdi_device_info>" }
+func (v *cdiDeviceInfoValue) Type() string          { return "llb.cdi_device_info" }
 func (v *cdiDeviceInfoValue) Freeze()               {}
 func (v *cdiDeviceInfoValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *cdiDeviceInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.CDIDeviceInfo") }
+func (v *cdiDeviceInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.cdi_device_info") }
 func (v *cdiDeviceInfoValue) Attr(name string) (starlark.Value, error) {
-	if v == nil { return nil, fmt.Errorf("llb.CDIDeviceInfo: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil { return nil, fmt.Errorf("llb.cdi_device_info: nil receiver") }
 	if name == "name" || name == "Name" { return starlark.String(v.info.Name), nil }
 	return nil, nil
 }
-func (v *cdiDeviceInfoValue) AttrNames() []string { return []string{"name", "Name"} }
+func (v *cdiDeviceInfoValue) AttrNames() []string { return SnakeCaseNames([]string{"name", "Name"}) }
 
 type sshInfoValue struct{ info buildkitllb.SSHInfo }
-func (v *sshInfoValue) String() string        { return "<llb.SSHInfo>" }
-func (v *sshInfoValue) Type() string          { return "llb.SSHInfo" }
+func (v *sshInfoValue) String() string        { return "<llb.ssh_info>" }
+func (v *sshInfoValue) Type() string          { return "llb.ssh_info" }
 func (v *sshInfoValue) Freeze()               {}
 func (v *sshInfoValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *sshInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.SSHInfo") }
+func (v *sshInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.ssh_info") }
 func (v *sshInfoValue) Attr(name string) (starlark.Value, error) {
-	if v == nil { return nil, fmt.Errorf("llb.SSHInfo: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil { return nil, fmt.Errorf("llb.ssh_info: nil receiver") }
 	switch name {
 	case "id", "ID": return starlark.String(v.info.ID), nil
 	case "target", "Target": return starlark.String(v.info.Target), nil
@@ -300,16 +307,17 @@ func (v *sshInfoValue) Attr(name string) (starlark.Value, error) {
 	default: return nil, nil
 	}
 }
-func (v *sshInfoValue) AttrNames() []string { return []string{"id", "target", "uid", "gid", "mode", "optional", "ID", "Target", "UID", "GID", "Mode", "Optional"} }
+func (v *sshInfoValue) AttrNames() []string { return SnakeCaseNames([]string{"id", "target", "uid", "gid", "mode", "optional", "ID", "Target", "UID", "GID", "Mode", "Optional"}) }
 
 type secretInfoValue struct{ info buildkitllb.SecretInfo }
-func (v *secretInfoValue) String() string        { return "<llb.SecretInfo>" }
-func (v *secretInfoValue) Type() string          { return "llb.SecretInfo" }
+func (v *secretInfoValue) String() string        { return "<llb.secret_info>" }
+func (v *secretInfoValue) Type() string          { return "llb.secret_info" }
 func (v *secretInfoValue) Freeze()               {}
 func (v *secretInfoValue) Truth() starlark.Bool  { return starlark.Bool(v != nil) }
-func (v *secretInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.SecretInfo") }
+func (v *secretInfoValue) Hash() (uint32, error) { return 0, fmt.Errorf("unhashable: llb.secret_info") }
 func (v *secretInfoValue) Attr(name string) (starlark.Value, error) {
-	if v == nil { return nil, fmt.Errorf("llb.SecretInfo: nil receiver") }
+	name = SnakeCaseIdentifier(name)
+	if v == nil { return nil, fmt.Errorf("llb.secret_info: nil receiver") }
 	switch name {
 	case "id", "ID": return starlark.String(v.info.ID), nil
 	case "target", "Target":
@@ -324,7 +332,7 @@ func (v *secretInfoValue) Attr(name string) (starlark.Value, error) {
 	default: return nil, nil
 	}
 }
-func (v *secretInfoValue) AttrNames() []string { return []string{"id", "target", "mode", "uid", "gid", "optional", "env", "env_name", "ID", "Target", "Mode", "UID", "GID", "Optional", "Env", "EnvName"} }
+func (v *secretInfoValue) AttrNames() []string { return SnakeCaseNames([]string{"id", "target", "mode", "uid", "gid", "optional", "env", "env_name", "ID", "Target", "Mode", "UID", "GID", "Optional", "Env", "EnvName"}) }
 
 // WrapMountInfo adapts a native mount description.
 func WrapMountInfo(info buildkitllb.MountInfo) starlark.Value { return &mountInfoValue{info: info} }
@@ -404,14 +412,14 @@ func newExecOpBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tup
 	var proxy *buildkitllb.ProxyEnv
 	if args[1] != starlark.None {
 		value, ok := args[1].(*ProxyEnvValue)
-		if !ok || value == nil { return nil, fmt.Errorf("NewExecOp: argument 2: got %s, want llb.ProxyEnv or None", valueType(args[1])) }
+		if !ok || value == nil { return nil, fmt.Errorf("NewExecOp: argument 2: got %s, want llb.proxy_env or None", valueType(args[1])) }
 		p := value.proxy
 		proxy = &p
 	}
 	readonly, ok := args[2].(starlark.Bool)
 	if !ok { return nil, fmt.Errorf("NewExecOp: argument 3: got %s, want bool", valueType(args[2])) }
 	constraints, ok := args[3].(*ConstraintsValue)
-	if !ok || constraints == nil { return nil, fmt.Errorf("NewExecOp: argument 4: got %s, want llb.Constraints", valueType(args[3])) }
+	if !ok || constraints == nil { return nil, fmt.Errorf("NewExecOp: argument 4: got %s, want llb.constraints", valueType(args[3])) }
 	return WrapExecOp(buildkitllb.NewExecOp(state, proxy, bool(readonly), constraints.Unwrap())), nil
 }
 
@@ -427,7 +435,7 @@ func execInfoBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tupl
 
 func proxyEnvBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var proxy buildkitllb.ProxyEnv
-	if err := starlark.UnpackArgs("ProxyEnv", args, kwargs,
+	if err := UnpackArgs("ProxyEnv", args, kwargs,
 		"http_proxy?", &proxy.HTTPProxy,
 		"https_proxy?", &proxy.HTTPSProxy,
 		"ftp_proxy?", &proxy.FTPProxy,
@@ -589,7 +597,7 @@ func tmpfsBuiltin(_ *starlark.Thread, _ *starlark.Builtin, args starlark.Tuple, 
 func withProxyOption(_ *starlark.Thread, args starlark.Tuple, kwargs []starlark.Tuple) (any, error) {
 	if err := arity("WithProxy", args, kwargs, 1, 1); err != nil { return nil, err }
 	proxy, ok := args[0].(*ProxyEnvValue)
-	if !ok || proxy == nil { return nil, fmt.Errorf("WithProxy: got %s, want llb.ProxyEnv", valueType(args[0])) }
+	if !ok || proxy == nil { return nil, fmt.Errorf("WithProxy: got %s, want llb.proxy_env", valueType(args[0])) }
 	return buildkitllb.WithProxy(proxy.proxy), nil
 }
 
@@ -636,7 +644,7 @@ func ulimitValues() map[string]starlark.Value {
 
 func stateFromValue(value starlark.Value) (buildkitllb.State, error) {
 	state, ok := value.(*StateValue)
-	if !ok || state == nil { return buildkitllb.State{}, fmt.Errorf("got %s, want llb.State", valueType(value)) }
+	if !ok || state == nil { return buildkitllb.State{}, fmt.Errorf("got %s, want llb.state", valueType(value)) }
 	return state.state, nil
 }
 
@@ -647,7 +655,7 @@ func outputFromValue(value starlark.Value) (buildkitllb.Output, error) {
 	case *OutputValue:
 		if v != nil { return v.output, nil }
 	}
-	return nil, fmt.Errorf("got %s, want llb.State or llb.Output", valueType(value))
+	return nil, fmt.Errorf("got %s, want llb.state or llb.output", valueType(value))
 }
 
 func (v *ExecStateValue) AttrNamesForState() []string { return stateAttrNames }
