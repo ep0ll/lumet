@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/client/llb"
+	"github.com/moby/buildkit/util/system"
 )
 
 // Copy copies one or more paths from the build context, a named stage, a named
@@ -24,6 +25,10 @@ func Copy(sources []string, destination string, opts ...Option) Instruction {
 		destination = b.expand(destination)
 		if destination == "" {
 			return fmt.Errorf("COPY: destination cannot be empty")
+		}
+		destination, err := normalizeDestination(destination, b)
+		if err != nil {
+			return fmt.Errorf("COPY: normalize destination: %w", err)
 		}
 
 		sourceState, err := resolveCopySource(b, options)
@@ -79,6 +84,10 @@ func Add(sources []AddSource, destination string, opts ...Option) Instruction {
 		if destination == "" {
 			return fmt.Errorf("ADD: destination cannot be empty")
 		}
+		destination, err := normalizeDestination(destination, b)
+		if err != nil {
+			return fmt.Errorf("ADD: normalize destination: %w", err)
+		}
 
 		var action *llb.FileAction
 		for _, source := range sources {
@@ -116,18 +125,19 @@ func resolveCopySource(b *Build, options InstructionOptions) (llb.State, error) 
 	if options.FromState != nil {
 		return *options.FromState, nil
 	}
-	if options.From == "" {
+	from := b.expand(options.From)
+	if from == "" {
 		return b.BuildContext, nil
 	}
-	if stage, ok := b.lookupStage(options.From); ok {
+	if stage, ok := b.lookupStage(from); ok {
 		return stage.State, nil
 	}
-	if state, ok := b.namedContexts[options.From]; ok {
+	if state, ok := b.namedContexts[from]; ok {
 		return state, nil
 	}
 	// Dockerfile COPY --from also accepts an image reference, not only a
 	// previously declared stage or named context.
-	return llb.Image(options.From, options.ImageOptions...).Platform(b.Platform), nil
+	return llb.Image(from, options.ImageOptions...).Platform(b.Platform), nil
 }
 
 func resolveAddSource(b *Build, source AddSource, options InstructionOptions) (llb.State, string, error) {
@@ -225,6 +235,10 @@ func combineConstraints(b *Build, options InstructionOptions) []llb.ConstraintsO
 	result = append(result, b.constraints...)
 	result = append(result, options.Constraints...)
 	return result
+}
+
+func normalizeDestination(destination string, b *Build) (string, error) {
+	return system.NormalizePath(b.Image.Config.WorkingDir, destination, b.Platform.OS, true)
 }
 
 func rootPath(source string) string {
