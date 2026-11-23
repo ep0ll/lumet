@@ -136,9 +136,6 @@ func Arg(name string, opts ...Option) Instruction {
 			return fmt.Errorf("ARG: name cannot be empty")
 		}
 		value, exists := b.BuildArgs[name]
-		if b.started && !exists {
-			value, exists = b.globalArgs[name]
-		}
 		if !exists && options.ArgDefault != nil {
 			if b.started {
 				value = b.expand(*options.ArgDefault)
@@ -146,6 +143,9 @@ func Arg(name string, opts ...Option) Instruction {
 				value = b.expandGlobal(*options.ArgDefault)
 			}
 			exists = true
+		}
+		if b.started && !exists {
+			value, exists = b.globalArgs[name]
 		}
 		if !exists {
 			value = ""
