@@ -274,3 +274,10 @@ func init(){
 		panic(err)
 	}
 }
+
+
+// builtin is the package-local Starlark builtin constructor shared by the
+// sourceresolver module files.
+func builtin(name string, fn func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error)) *starlark.Builtin {
+	return starlark.NewBuiltin(name, fn)
+}
