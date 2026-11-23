@@ -3,6 +3,7 @@ package dockerfile
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"fmt"
 	"os"
 	"path"
@@ -69,8 +70,9 @@ func From(reference string, opts ...Option) Instruction {
 		}
 
 		var (
-			state llb.State
-			image = emptyImage(platform)
+			state         llb.State
+			image         = emptyImage(platform)
+			inheritedArgs = make(map[string]string)
 		)
 		switch {
 		case options.BaseState != nil:
@@ -81,15 +83,7 @@ func From(reference string, opts ...Option) Instruction {
 			if stage, ok := b.lookupStage(ref); ok {
 				state = stage.State
 				image = cloneImage(stage.Image)
-				for name := range stage.Args {
-					state = state.DelEnv(name)
-				}
-				for _, entry := range image.Config.Env {
-					key, value, found := strings.Cut(entry, "=")
-					if found {
-						state = state.AddEnv(key, value)
-					}
-				}
+				inheritedArgs = maps.Clone(stage.Args)
 				if options.Platform == nil {
 					platform = clonePlatform(stage.Platform)
 				}
@@ -159,12 +153,14 @@ func Arg(name string, opts ...Option) Instruction {
 		if b.started && !exists {
 			value, exists = b.globalArgs[name]
 		}
-		if !exists {
+		if !exists && !b.started {
 			value = ""
 		}
 		if b.started {
-			b.stageArgs[name] = value
-			b.State = b.State.AddEnv(name, value)
+			if exists {
+				b.stageArgs[name] = value
+				b.State = b.State.AddEnv(name, value)
+			}
 		} else {
 			b.globalArgs[name] = value
 		}
