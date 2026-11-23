@@ -1,123 +1,521 @@
 package dockerfile
 
-import ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
 
-var _ ocispecs.Image // image config is manipulated by handlers
+	"github.com/moby/buildkit/client/llb"
+	"github.com/moby/buildkit/util/system"
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	digest "github.com/opencontainers/go-digest"
+	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
+)
 
-// From starts a stage: From(Image("golang:1.23"), As("build")).
-func From(base Base, opts ...FromOption) StageInit {
-	s := FromSpec{Base: base}
-	for _, o := range opts {
-		o.applyFrom(&s)
+// KeyValue represents an ENV or LABEL entry.
+type KeyValue struct {
+	Key   string
+	Value string
+}
+
+// KV constructs a key/value pair for ENV and LABEL.
+func KV(key, value string) KeyValue { return KeyValue{Key: key, Value: value} }
+
+// Command is a shell-form or exec-form command.
+type Command interface {
+	commandForm()
+}
+
+// ShellForm is a command string interpreted by the image's configured shell.
+type ShellForm string
+
+// ExecForm is an argv-style command that is executed directly.
+type ExecForm []string
+
+func (ShellForm) commandForm() {}
+func (ExecForm) commandForm()  {}
+
+// Sh creates a shell-form command.
+func Sh(command string) ShellForm { return ShellForm(command) }
+
+// Exec creates an exec-form command.
+func Exec(args ...string) ExecForm { return ExecForm(args) }
+
+// From starts a build stage from an image, scratch, a previous stage or a
+// registered named context. The returned function applies the stage to Build.
+func From(reference string, opts ...Option) Instruction {
+	options := collectOptions(opts)
+	return func(ctx context.Context, b *Build) error {
+		if b == nil {
+			return fmt.Errorf("FROM: nil build")
+		}
+		b.saveStage()
+
+		ref := b.expand(reference)
+		platform := clonePlatform(b.Platform)
+		if options.platform != nil {
+			platform = clonePlatform(*options.platform)
+		}
+
+		var (
+			state llb.State
+			image = emptyImage(platform)
+		)
+		switch {
+		case strings.EqualFold(ref, "scratch"):
+			state = llb.Scratch()
+		case func() bool { _, ok := b.stages[ref]; return ok }():
+			stage := b.stages[ref]
+			state = stage.State
+			image = cloneImage(stage.Image)
+			if options.platform == nil {
+				platform = clonePlatform(stage.Platform)
+			}
+		case func() bool { _, ok := b.namedContexts[ref]; return ok }():
+			state = b.namedContexts[ref]
+		default:
+			state = llb.Image(ref, options.image...)
+			if b.ImageResolver != nil {
+				resolved, err := b.ImageResolver(ctx, ref, platform)
+				if err != nil {
+					return fmt.Errorf("resolve base image %q: %w", ref, err)
+				}
+				image = cloneImage(resolved)
+				config, err := json.Marshal(resolved)
+				if err != nil {
+					return fmt.Errorf("encode base image config %q: %w", ref, err)
+				}
+				state, err = state.WithImageConfig(config)
+				if err != nil {
+					return fmt.Errorf("apply base image config %q: %w", ref, err)
+				}
+			}
+		}
+
+		state = state.Platform(platform)
+		if image.Config.User != "" {
+			state = state.User(image.Config.User)
+		}
+
+		b.State = state
+		b.Image = image
+		b.Platform = platform
+		b.stageName = options.stageName
+		b.started = true
+		return nil
 	}
-	return stageInit[FromSpec]{instruction[FromSpec]{KindFrom, s, func(h *Handlers) Handler[FromSpec] { return h.From }}}
 }
 
-// ResetStage is the "reset" flavour of FROM, kept as its own instruction so
-// From stays small and its handler independent.
-func ResetStage(base Base, opts ...FromOption) StageInit {
-	s := ResetSpec{FromSpec{Base: base}}
-	for _, o := range opts {
-		o.applyFrom(&s.FromSpec)
+// Arg declares a build-time argument. A build value supplied with
+// WithBuildArgs takes precedence over the optional default.
+func Arg(name string, opts ...Option) Instruction {
+	options := collectOptions(opts)
+	return func(ctx context.Context, b *Build) error {
+		if name == "" {
+			return fmt.Errorf("ARG: name cannot be empty")
+		}
+		value, exists := b.BuildArgs[name]
+		if !exists && options.argDefault != nil {
+			value = b.expand(*options.argDefault)
+			b.BuildArgs[name] = value
+			exists = true
+		}
+		if exists && b.started {
+			b.State = b.State.AddEnv(name, value)
+		}
+		return b.recordHistory(ctx, "ARG "+name, true)
 	}
-	return stageInit[ResetSpec]{instruction[ResetSpec]{KindResetStage, s, func(h *Handlers) Handler[ResetSpec] { return h.ResetStage }}}
 }
 
-func Arg(name string, opts ...ArgOption) Trigger {
-	s := ArgSpec{Name: name}
-	for _, o := range opts {
-		o.applyArg(&s)
+// Env sets environment variables in both the LLB state and image config.
+func Env(values ...KeyValue) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("ENV"); err != nil {
+			return err
+		}
+		parts := make([]string, 0, len(values))
+		for _, item := range values {
+			if item.Key == "" {
+				return fmt.Errorf("ENV: key cannot be empty")
+			}
+			value := b.expand(item.Value)
+			b.State = b.State.AddEnv(item.Key, value)
+			b.Image.Config.Env = setEnv(b.Image.Config.Env, item.Key, value)
+			parts = append(parts, item.Key+"="+value)
+		}
+		return b.recordHistory(ctx, "ENV "+strings.Join(parts, " "), true)
 	}
-	return trigger[ArgSpec]{instruction[ArgSpec]{KindArg, s, func(h *Handlers) Handler[ArgSpec] { return h.Arg }}}
 }
 
-func Env(vars []KeyValue, opts ...CommonOption) Trigger {
-	return trigger[EnvSpec]{instruction[EnvSpec]{KindEnv, EnvSpec{collect(opts), vars}, func(h *Handlers) Handler[EnvSpec] { return h.Env }}}
-}
-
-func Label(labels []KeyValue, opts ...CommonOption) Trigger {
-	return trigger[LabelSpec]{instruction[LabelSpec]{KindLabel, LabelSpec{collect(opts), labels}, func(h *Handlers) Handler[LabelSpec] { return h.Label }}}
-}
-
-// Deprecated: use Label(KV("org.opencontainers.image.authors", ...)).
-func Maintainer(name string, opts ...CommonOption) Instruction {
-	return instruction[MaintainerSpec]{KindMaintainer, MaintainerSpec{collect(opts), name}, func(h *Handlers) Handler[MaintainerSpec] { return h.Maintainer }}
-}
-
-func Run(cmd Command, opts ...RunOption) Trigger {
-	s := RunSpec{Command: cmd}
-	for _, o := range opts {
-		o.applyRun(&s)
+// Label adds image labels.
+func Label(values ...KeyValue) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("LABEL"); err != nil {
+			return err
+		}
+		if b.Image.Config.Labels == nil {
+			b.Image.Config.Labels = make(map[string]string, len(values))
+		}
+		parts := make([]string, 0, len(values))
+		for _, item := range values {
+			if item.Key == "" {
+				return fmt.Errorf("LABEL: key cannot be empty")
+			}
+			value := b.expand(item.Value)
+			b.Image.Config.Labels[item.Key] = value
+			parts = append(parts, item.Key+"="+value)
+		}
+		return b.recordHistory(ctx, "LABEL "+strings.Join(parts, " "), true)
 	}
-	return trigger[RunSpec]{instruction[RunSpec]{KindRun, s, func(h *Handlers) Handler[RunSpec] { return h.Run }}}
 }
 
-func Cmd(cmd Command, opts ...CommonOption) Trigger {
-	return trigger[CmdSpec]{instruction[CmdSpec]{KindCmd, CmdSpec{collect(opts), cmd}, func(h *Handlers) Handler[CmdSpec] { return h.Cmd }}}
-}
-
-func Entrypoint(cmd Command, opts ...CommonOption) Trigger {
-	return trigger[EntrypointSpec]{instruction[EntrypointSpec]{KindEntrypoint, EntrypointSpec{collect(opts), cmd}, func(h *Handlers) Handler[EntrypointSpec] { return h.Entrypoint }}}
-}
-
-func Shell(shell ExecForm, opts ...CommonOption) Trigger {
-	return trigger[ShellSpec]{instruction[ShellSpec]{KindShell, ShellSpec{collect(opts), shell}, func(h *Handlers) Handler[ShellSpec] { return h.Shell }}}
-}
-
-func Expose(ports []ExposedPort, opts ...CommonOption) Trigger {
-	return trigger[ExposeSpec]{instruction[ExposeSpec]{KindExpose, ExposeSpec{collect(opts), ports}, func(h *Handlers) Handler[ExposeSpec] { return h.Expose }}}
-}
-
-func Volume(paths []string, opts ...CommonOption) Trigger {
-	return trigger[VolumeSpec]{instruction[VolumeSpec]{KindVolume, VolumeSpec{collect(opts), paths}, func(h *Handlers) Handler[VolumeSpec] { return h.Volume }}}
-}
-
-func User(user Principal, opts ...UserOption) Trigger {
-	s := UserSpec{User: user}
-	for _, o := range opts {
-		o.applyUser(&s)
+// Maintainer sets the deprecated Docker image author metadata.
+func Maintainer(name string) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("MAINTAINER"); err != nil {
+			return err
+		}
+		b.Image.Author = name
+		return b.recordHistory(ctx, "MAINTAINER "+name, true)
 	}
-	return trigger[UserSpec]{instruction[UserSpec]{KindUser, s, func(h *Handlers) Handler[UserSpec] { return h.User }}}
 }
 
-func Workdir(path string, opts ...CommonOption) Trigger {
-	return trigger[WorkdirSpec]{instruction[WorkdirSpec]{KindWorkdir, WorkdirSpec{collect(opts), path}, func(h *Handlers) Handler[WorkdirSpec] { return h.Workdir }}}
-}
-
-func Copy(src Sources, dest string, opts ...CopyOption) Trigger {
-	s := CopySpec{Src: src, Dest: dest}
-	for _, o := range opts {
-		o.applyCopy(&s)
+// Cmd sets the image's default command.
+func Cmd(command Command) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("CMD"); err != nil {
+			return err
+		}
+		args, err := commandArgs(command, b.Image.Config.Shell, b.Platform.OS)
+		if err != nil {
+			return fmt.Errorf("CMD: %w", err)
+		}
+		b.Image.Config.Cmd = args
+		return b.recordHistory(ctx, "CMD "+formatCommand(command), true)
 	}
-	return trigger[CopySpec]{instruction[CopySpec]{KindCopy, s, func(h *Handlers) Handler[CopySpec] { return h.Copy }}}
 }
 
-func Add(src []AddSource, dest string, opts ...AddOption) Trigger {
-	s := AddSpec{Src: src, Dest: dest}
-	for _, o := range opts {
-		o.applyAdd(&s)
+// Entrypoint sets the image's entrypoint.
+func Entrypoint(command Command) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("ENTRYPOINT"); err != nil {
+			return err
+		}
+		args, err := commandArgs(command, b.Image.Config.Shell, b.Platform.OS)
+		if err != nil {
+			return fmt.Errorf("ENTRYPOINT: %w", err)
+		}
+		b.Image.Config.Entrypoint = args
+		return b.recordHistory(ctx, "ENTRYPOINT "+formatCommand(command), true)
 	}
-	return trigger[AddSpec]{instruction[AddSpec]{KindAdd, s, func(h *Handlers) Handler[AddSpec] { return h.Add }}}
 }
 
-func StopSignal(sig Signal, opts ...CommonOption) Trigger {
-	return trigger[StopSignalSpec]{instruction[StopSignalSpec]{KindStopSignal, StopSignalSpec{collect(opts), sig}, func(h *Handlers) Handler[StopSignalSpec] { return h.StopSignal }}}
-}
-
-func Healthcheck(cmd Command, opts ...HealthcheckOption) Trigger {
-	s := HealthcheckSpec{Command: cmd}
-	for _, o := range opts {
-		o.applyHealthcheck(&s)
+// Shell changes the shell used for shell-form RUN, CMD and ENTRYPOINT.
+func Shell(args ...string) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("SHELL"); err != nil {
+			return err
+		}
+		if len(args) == 0 {
+			return fmt.Errorf("SHELL: at least one executable argument is required")
+		}
+		b.Image.Config.Shell = append([]string(nil), args...)
+		return b.recordHistory(ctx, "SHELL "+strings.Join(args, " "), true)
 	}
-	return trigger[HealthcheckSpec]{instruction[HealthcheckSpec]{KindHealthcheck, s, func(h *Handlers) Handler[HealthcheckSpec] { return h.Healthcheck }}}
 }
 
-func HealthcheckNone(opts ...CommonOption) Trigger {
-	s := HealthcheckSpec{Common: collect(opts), None: true}
-	return trigger[HealthcheckSpec]{instruction[HealthcheckSpec]{KindHealthcheck, s, func(h *Handlers) Handler[HealthcheckSpec] { return h.Healthcheck }}}
+// Expose declares one or more container ports. Ports may include a protocol
+// suffix and a range, for example 8080/tcp or 8000-8005/udp.
+func Expose(ports ...string) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("EXPOSE"); err != nil {
+			return err
+		}
+		if b.Image.Config.ExposedPorts == nil {
+			b.Image.Config.ExposedPorts = make(map[string]struct{})
+		}
+		for _, value := range ports {
+			expanded, err := expandPorts(value)
+			if err != nil {
+				return fmt.Errorf("EXPOSE: %w", err)
+			}
+			for _, port := range expanded {
+				b.Image.Config.ExposedPorts[port] = struct{}{}
+			}
+		}
+		return b.recordHistory(ctx, "EXPOSE "+strings.Join(ports, " "), true)
+	}
 }
 
-// OnBuild only accepts Triggers: From/OnBuild/Maintainer inside it is a compile error.
-func OnBuild(t Trigger, opts ...CommonOption) Instruction {
-	return instruction[OnBuildSpec]{KindOnBuild, OnBuildSpec{collect(opts), t}, func(h *Handlers) Handler[OnBuildSpec] { return h.OnBuild }}
+// Volume declares one or more persistent data paths in the image config.
+func Volume(paths ...string) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("VOLUME"); err != nil {
+			return err
+		}
+		if b.Image.Config.Volumes == nil {
+			b.Image.Config.Volumes = make(map[string]struct{}, len(paths))
+		}
+		for _, value := range paths {
+			if value == "" {
+				return fmt.Errorf("VOLUME: path cannot be empty")
+			}
+			if !strings.HasPrefix(value, "/") {
+				value = strings.TrimSuffix(b.Image.Config.WorkingDir, "/") + "/" + value
+			}
+			b.Image.Config.Volumes[pathClean(value)] = struct{}{}
+		}
+		return b.recordHistory(ctx, "VOLUME "+strings.Join(paths, " "), true)
+	}
 }
+
+// User sets the default process user in the LLB state and image config.
+// Values such as user, uid, user:group and uid:gid are passed through to BuildKit.
+func User(user string) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("USER"); err != nil {
+			return err
+		}
+		if user == "" {
+			return fmt.Errorf("USER: user cannot be empty")
+		}
+		user = b.expand(user)
+		b.State = b.State.User(user)
+		b.Image.Config.User = user
+		return b.recordHistory(ctx, "USER "+user, true)
+	}
+}
+
+// Workdir changes the working directory and creates it in the filesystem.
+func Workdir(directory string) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("WORKDIR"); err != nil {
+			return err
+		}
+		directory = b.expand(directory)
+		normalized, err := system.NormalizeWorkdir(b.Image.Config.WorkingDir, directory, b.Platform.OS)
+		if err != nil {
+			return fmt.Errorf("WORKDIR: normalize path: %w", err)
+		}
+		b.Image.Config.WorkingDir = normalized
+		slashPath := system.ToSlash(normalized, b.Platform.OS)
+		b.State = b.State.Dir(slashPath)
+		if slashPath != "/" {
+			mkdirOptions := []llb.MkdirOption{llb.WithParents(true)}
+			if b.Image.Config.User != "" {
+				mkdirOptions = append(mkdirOptions, llb.WithUser(b.Image.Config.User))
+			}
+			if b.createdAt != nil {
+				mkdirOptions = append(mkdirOptions, llb.WithCreatedTime(*b.createdAt))
+			}
+			b.State = b.State.File(llb.Mkdir(slashPath, 0o755, mkdirOptions...), b.constraints...)
+		}
+		return b.recordHistory(ctx, "WORKDIR "+normalized, slashPath != "/")
+	}
+}
+
+// StopSignal sets the image's stop signal. It accepts any standard-library
+// os.Signal implementation; syscall.Signal values are serialized numerically,
+// avoiding a package-maintained list of platform-specific signal constants.
+func StopSignal(signal os.Signal) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("STOPSIGNAL"); err != nil {
+			return err
+		}
+		if signal == nil {
+			return fmt.Errorf("STOPSIGNAL: signal cannot be nil")
+		}
+		value := signal.String()
+		if number, ok := signal.(syscall.Signal); ok && number > 0 {
+			value = strconv.Itoa(int(number))
+		}
+		b.Image.Config.StopSignal = value
+		return b.recordHistory(ctx, "STOPSIGNAL "+value, true)
+	}
+}
+
+// Healthcheck sets the image health check. Use HealthcheckNone to disable an
+// inherited health check.
+func Healthcheck(command Command, opts ...Option) Instruction {
+	options := collectOptions(opts)
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("HEALTHCHECK"); err != nil {
+			return err
+		}
+		var test []string
+		switch command := command.(type) {
+		case ExecForm:
+			test = append([]string{"CMD"}, []string(command)...)
+		case ShellForm:
+			test = []string{"CMD-SHELL", string(command)}
+		default:
+			return fmt.Errorf("HEALTHCHECK: unsupported command form %T", command)
+		}
+		b.Image.Config.Healthcheck = &dockerspec.HealthcheckConfig{
+			Test: test, Interval: options.healthInterval,
+			Timeout: options.healthTimeout, StartPeriod: options.healthStartPeriod,
+			StartInterval: options.healthStartInterval, Retries: options.healthRetries,
+		}
+		return b.recordHistory(ctx, "HEALTHCHECK "+formatCommand(command), true)
+	}
+}
+
+// HealthcheckNone disables an inherited health check.
+func HealthcheckNone() Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("HEALTHCHECK"); err != nil {
+			return err
+		}
+		b.Image.Config.Healthcheck = &dockerspec.HealthcheckConfig{Test: []string{"NONE"}}
+		return b.recordHistory(ctx, "HEALTHCHECK NONE", true)
+	}
+}
+
+// OnBuild appends a trigger expression to the image's ONBUILD metadata. The
+// expression is stored as Dockerfile text and runs when this image is a base.
+func OnBuild(trigger string) Instruction {
+	return func(ctx context.Context, b *Build) error {
+		if err := b.requireStage("ONBUILD"); err != nil {
+			return err
+		}
+		trigger = strings.TrimSpace(trigger)
+		if trigger == "" {
+			return fmt.Errorf("ONBUILD: trigger cannot be empty")
+		}
+		opcode := strings.ToUpper(strings.Fields(trigger)[0])
+		switch opcode {
+		case "FROM", "MAINTAINER", "ONBUILD":
+			return fmt.Errorf("ONBUILD: %s cannot be used as a trigger", opcode)
+		}
+		b.Image.Config.OnBuild = append(b.Image.Config.OnBuild, trigger)
+		return b.recordHistory(ctx, "ONBUILD "+trigger, true)
+	}
+}
+
+func commandArgs(command Command, configuredShell []string, osName string) ([]string, error) {
+	switch value := command.(type) {
+	case ExecForm:
+		if len(value) == 0 {
+			return nil, fmt.Errorf("exec form cannot be empty")
+		}
+		return append([]string(nil), value...), nil
+	case ShellForm:
+		shell := configuredShell
+		if len(shell) == 0 {
+			shell = defaultShell(osName)
+		}
+		if len(shell) == 0 {
+			return nil, fmt.Errorf("no default shell for OS %q", osName)
+		}
+		return append(append([]string(nil), shell...), string(value)), nil
+	default:
+		return nil, fmt.Errorf("unsupported command form %T", command)
+	}
+}
+
+func defaultShell(osName string) []string {
+	if strings.EqualFold(osName, "windows") {
+		return []string{"cmd", "/S", "/C"}
+	}
+	return []string{"/bin/sh", "-c"}
+}
+
+func formatCommand(command Command) string {
+	switch value := command.(type) {
+	case ShellForm:
+		return string(value)
+	case ExecForm:
+		return "[" + strings.Join([]string(value), " ") + "]"
+	default:
+		return fmt.Sprintf("%v", command)
+	}
+}
+
+func setEnv(env []string, key, value string) []string {
+	result := make([]string, 0, len(env)+1)
+	replaced := false
+	for _, item := range env {
+		currentKey, _, _ := strings.Cut(item, "=")
+		if currentKey == key {
+			if !replaced {
+				result = append(result, key+"="+value)
+				replaced = true
+			}
+			continue
+		}
+		result = append(result, item)
+	}
+	if !replaced {
+		result = append(result, key+"="+value)
+	}
+	return result
+}
+
+func expandVariables(value string, args map[string]string, env []string) string {
+	environment := make(map[string]string, len(args)+len(env))
+	for _, item := range env {
+		key, current, found := strings.Cut(item, "=")
+		if found {
+			environment[key] = current
+		}
+	}
+	for key, current := range args {
+		environment[key] = current
+	}
+	return os.Expand(value, func(key string) string {
+		return environment[key]
+	})
+}
+
+func expandPorts(value string) ([]string, error) {
+	parts := strings.Split(value, "/")
+	if len(parts) > 2 || parts[0] == "" {
+		return nil, fmt.Errorf("invalid port %q", value)
+	}
+	protocol := "tcp"
+	if len(parts) == 2 {
+		protocol = strings.ToLower(parts[1])
+	}
+	if protocol != "tcp" && protocol != "udp" && protocol != "sctp" {
+		return nil, fmt.Errorf("unsupported protocol in %q", value)
+	}
+
+	bounds := strings.Split(parts[0], "-")
+	if len(bounds) > 2 {
+		return nil, fmt.Errorf("invalid port range %q", value)
+	}
+	start, err := strconv.Atoi(bounds[0])
+	if err != nil || start < 1 || start > 65535 {
+		return nil, fmt.Errorf("invalid port %q", value)
+	}
+	end := start
+	if len(bounds) == 2 {
+		end, err = strconv.Atoi(bounds[1])
+		if err != nil || end < start || end > 65535 {
+			return nil, fmt.Errorf("invalid port range %q", value)
+		}
+	}
+	result := make([]string, 0, end-start+1)
+	for port := start; port <= end; port++ {
+		result = append(result, strconv.Itoa(port)+"/"+protocol)
+	}
+	return result, nil
+}
+
+func pathClean(value string) string {
+	if value == "" {
+		return "/"
+	}
+	return strings.TrimSuffix(strings.ReplaceAll(value, "//", "/"), "/")
+}
+
+// keep syscall imported as the standard-library signal representation.
+var _ os.Signal = syscall.Signal(0)
+var _ = time.Second
+var _ = digest.Digest("")
+var _ ocispecs.Platform
