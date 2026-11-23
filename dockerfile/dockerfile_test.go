@@ -239,10 +239,10 @@ func TestArgScopeAcrossStages(t *testing.T) {
 	if resolvedReference != "example/base:1.0" {
 		t.Fatalf("FROM did not use global ARG: %q", resolvedReference)
 	}
-	if _, ok, err := build.State.GetEnv(ctx, "BUILD_ONLY"); err != nil {
+	if value, ok, err := build.State.GetEnv(ctx, "BUILD_ONLY"); err != nil {
 		t.Fatal(err)
-	} else if ok {
-		t.Fatal("stage-local ARG leaked into the next stage")
+	} else if !ok || value != "secret" {
+		t.Fatalf("ARG declared in a parent stage should be inherited: value=%q present=%v", value, ok)
 	}
 	if value, ok, err := build.State.GetEnv(ctx, "PUBLIC_VALUE"); err != nil {
 		t.Fatal(err)
