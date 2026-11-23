@@ -54,6 +54,8 @@ type Build struct {
 	started       bool
 	createdAt     *time.Time
 	constraints   []llb.ConstraintsOpt
+	globalArgs    map[string]string
+	stageArgs     map[string]string
 }
 
 // Stage is a named, immutable snapshot that can be used by a later FROM or
@@ -83,6 +85,8 @@ func New(opts ...BuildOption) *Build {
 		Image:         emptyImage(platform),
 		BuildContext:  llb.Local("context"),
 		BuildArgs:     make(map[string]string),
+		globalArgs:    make(map[string]string),
+		stageArgs:     make(map[string]string),
 		namedContexts: make(map[string]llb.State),
 		stages:        make(map[string]Stage),
 	}
@@ -232,7 +236,11 @@ func (b *Build) requireStage(instruction string) error {
 }
 
 func (b *Build) expand(value string) string {
-	return expandVariables(value, b.BuildArgs, b.Image.Config.Env)
+	return expandVariables(value, b.stageArgs, b.Image.Config.Env)
+}
+
+func (b *Build) expandGlobal(value string) string {
+	return expandVariables(value, b.globalArgs, nil)
 }
 
 func (b *Build) recordHistory(ctx context.Context, createdBy string, emptyLayer bool) error {
