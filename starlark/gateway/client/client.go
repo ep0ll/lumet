@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	buildkitllb "github.com/moby/buildkit/client/llb"
 	buildkitsourceresolver "github.com/moby/buildkit/client/llb/sourceresolver"
 	gwclient "github.com/moby/buildkit/frontend/gateway/client"
 	"github.com/moby/buildkit/solver/pb"
@@ -197,7 +196,7 @@ func ociPlatformValue(platform ocispecs.Platform) starlark.Value {
 func metaResponseValue(response *buildkitsourceresolver.MetaResponse) starlark.Value {
 	if response == nil { return starlark.None }
 	fields := starlark.StringDict{"op": starlark.None, "image": starlark.None, "git": starlark.None, "http": starlark.None}
-	if response.Op != nil { fields["op"] = &starlarksourceresolver.SourceOpValue{} }
+	if response.Op != nil { fields["op"] = starlarksourceresolver.WrapSourceOp(response.Op) }
 	// Keep response conversion explicit so the Starlark schema is stable and
 	// independent of Go field-name reflection.
 	if response.Image != nil {
@@ -294,5 +293,3 @@ func BuildFunc(build starlark.Callable) gwclient.BuildFunc {
 	}
 }
 
-var _ gwclient.Client
-var _ buildkitllb.State
