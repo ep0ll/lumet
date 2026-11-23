@@ -18,9 +18,9 @@ type Option func(*InstructionOptions)
 // consumed by instruction functions. Additional flags can be introduced as
 // fields without changing existing instruction signatures.
 type InstructionOptions struct {
-	StageName   string
-	Platform    *ocispecs.Platform
-	BaseState   *llb.State
+	StageName    string
+	Platform     *ocispecs.Platform
+	BaseState    *llb.State
 	ImageOptions []llb.ImageOption
 	RunOptions   []llb.RunOption
 	CopyOptions  []llb.CopyOption
