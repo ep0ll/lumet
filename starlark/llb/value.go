@@ -324,3 +324,10 @@ func uint64OptionBuiltin[T any](name, kind string, build func(uint64) T) *starla
 		return build(value), nil
 	})
 }
+
+
+// UnwrapOption extracts a native BuildKit option from a Starlark value.
+// This is primarily useful to wrapper subpackages that compose LLB options.
+func UnwrapOption[T any](value starlark.Value, family string) (T, error) {
+	return optionFromValue[T](value, family)
+}
