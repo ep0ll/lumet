@@ -299,5 +299,9 @@ func WrapSourceOp(op *pb.SourceOp) *SourceOpValue {
 
 // UnwrapOpt extracts the native BuildKit sourceresolver.Opt created by opt().
 func UnwrapOpt(value starlark.Value) (buildkitsourceresolver.Opt, error) {
-	return recordFrom[buildkitsourceresolver.Opt](value, "opt")
+	option, ok := value.(*starlarkllb.SourceResolverOptValue)
+	if !ok || option == nil {
+		return buildkitsourceresolver.Opt{}, fmt.Errorf("got %s, want llb.source_resolver_opt", starlarkType(value))
+	}
+	return option.Unwrap(), nil
 }
