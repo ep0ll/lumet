@@ -185,9 +185,11 @@ func initializeFrom(
 
 func unresolvedImage(platform ocispecs.Platform) dockerspec.DockerOCIImage {
 	image := dockerspec.DockerOCIImage{
-		OS: platform.OS, Architecture: platform.Architecture,
-		Variant: platform.Variant, OSVersion: platform.OSVersion,
-		OSFeatures: append([]string(nil), platform.OSFeatures...),
+		Image: ocispecs.Image{
+			OS: platform.OS, Architecture: platform.Architecture,
+			Variant: platform.Variant, OSVersion: platform.OSVersion,
+			OSFeatures: append([]string(nil), platform.OSFeatures...),
+		},
 	}
 	image.RootFS.Type = "layers"
 	image.Config.WorkingDir = "/"
