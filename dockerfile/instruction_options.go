@@ -45,3 +45,7 @@ func WithDeferredDependencies() InstructionOption {
 		metadata.DeferredDependencies = true
 	}
 }
+
+func WithGlobalARG() InstructionOption {
+	return func(metadata *InstructionMetadata) { metadata.GlobalARG = true }
+}

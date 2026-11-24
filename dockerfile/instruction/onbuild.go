@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -10,13 +10,13 @@ import (
 // trigger in the declaring stage; a derived stage executes it immediately
 // after its FROM closure resolves.
 func OnBuild(trigger Instruction) Instruction {
-	return NewInstruction("ONBUILD", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
-		if trigger.action == nil {
+	return newMutationInstruction("ONBUILD", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+		if !trigger.Valid() {
 			return errors.New("ONBUILD trigger has no action")
 		}
-		switch trigger.name {
+		switch trigger.Name() {
 		case "FROM", "MAINTAINER", "ONBUILD":
-			return fmt.Errorf("%s cannot be used as an ONBUILD trigger", trigger.name)
+			return fmt.Errorf("%s cannot be used as an ONBUILD trigger", trigger.Name())
 		}
 		expression, err := trigger.OnBuildExpression()
 		if err != nil {

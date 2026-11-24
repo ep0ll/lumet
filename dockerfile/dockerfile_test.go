@@ -1,4 +1,4 @@
-package dockerfile
+package dockerfile_test
 
 import (
 	"context"
@@ -9,31 +9,34 @@ import (
 	"github.com/moby/buildkit/client/llb"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/ep0ll/lumet/dockerfile"
+	"github.com/ep0ll/lumet/dockerfile/instruction"
 	"github.com/ep0ll/lumet/dockerfile/progress"
 )
 
 func TestGlobalArgExpansionAndImageStateTransitions(t *testing.T) {
-	df := New(
-		WithPlatform(testPlatform()),
-		WithImageResolver(func(_ context.Context, reference string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
+	df := dockerfile.New(
+		dockerfile.WithPlatform(testPlatform()),
+		dockerfile.WithImageResolver(func(_ context.Context, reference string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
 			if reference != "alpine:3.21" {
 				t.Fatalf("image reference = %q", reference)
 			}
-			return emptyImage(testPlatform()), nil
+			return testImage(), nil
 		}),
 	)
-	if err := df.AddGlobal(Arg("BASE", ArgDefault("alpine:3.21"))); err != nil {
+	if err := df.AddGlobal(instruction.Arg("BASE", instruction.ArgDefault("alpine:3.21"))); err != nil {
 		t.Fatal(err)
 	}
 	if err := df.AddStage(
-		From(Image("$BASE"), As("build")),
-		Arg("APP_VERSION", ArgDefault("1.0")),
-		Env([]KeyValue{KV("APP", "service")}),
-		Env([]KeyValue{KV("APP_HOME", "/opt/$APP")}),
-		Workdir("$APP_HOME"),
-		Expose(TCP(8080), UDP(5353)),
-		Volume("/var/lib/$APP"),
-		Label([]KeyValue{KV("org.example.version", "$APP_VERSION")}),
+		dockerfile.From(dockerfile.Image("$BASE"), dockerfile.As("build")),
+		instruction.Arg("APP_VERSION", instruction.ArgDefault("1.0")),
+		instruction.Env([]instruction.KeyValue{instruction.KV("APP", "service")}),
+		instruction.Env([]instruction.KeyValue{instruction.KV("APP_HOME", "/opt/$APP")}),
+		instruction.Workdir("$APP_HOME"),
+		instruction.Expose(instruction.TCP(8080), instruction.UDP(5353)),
+		instruction.Volume("/var/lib/$APP"),
+		instruction.Label([]instruction.KeyValue{instruction.KV("org.example.version", "$APP_VERSION")}),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -66,12 +69,12 @@ func TestGlobalArgExpansionAndImageStateTransitions(t *testing.T) {
 }
 
 func TestEnvPairsExpandAgainstPreInstructionEnvironment(t *testing.T) {
-	df := New()
+	df := dockerfile.New()
 	if err := df.AddStage(
-		From(Scratch(), As("env")),
-		Env([]KeyValue{
-			KV("A", "first"),
-			KV("B", "$A"),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("env")),
+		instruction.Env([]instruction.KeyValue{
+			instruction.KV("A", "first"),
+			instruction.KV("B", "$A"),
 		}),
 	); err != nil {
 		t.Fatal(err)
@@ -86,16 +89,16 @@ func TestEnvPairsExpandAgainstPreInstructionEnvironment(t *testing.T) {
 }
 
 func TestOnBuildIsRecordedThenExecutedInDerivedStage(t *testing.T) {
-	df := New()
+	df := dockerfile.New()
 	if err := df.AddStage(
-		From(Scratch(), As("parent")),
-		OnBuild(Env([]KeyValue{KV("TRIGGERED", "yes")})),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("parent")),
+		instruction.OnBuild(instruction.Env([]instruction.KeyValue{instruction.KV("TRIGGERED", "yes")})),
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := df.AddStage(
-		From(StageOf("parent"), As("child")),
-		Env([]KeyValue{KV("CHILD", "$TRIGGERED")}),
+		dockerfile.From(dockerfile.StageOf("parent"), dockerfile.As("child")),
+		instruction.Env([]instruction.KeyValue{instruction.KV("CHILD", "$TRIGGERED")}),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -120,22 +123,25 @@ func TestOnBuildIsRecordedThenExecutedInDerivedStage(t *testing.T) {
 	}
 }
 
-func TestOnBuildStageDependenciesAreResolvedWhenTriggered(t *testing.T) {
-	df := New()
+func TestOnBuildStageDependenciesResolveWhenTriggered(t *testing.T) {
+	df := dockerfile.New()
 	if err := df.AddStage(
-		From(Scratch(), As("parent")),
-		OnBuild(Copy(Sources{"/artifact"}, "/opt/artifact", CopyFrom(StageOf("assets")))),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("parent")),
+		instruction.OnBuild(instruction.Copy(
+			instruction.Sources{"/artifact"}, "/opt/artifact",
+			instruction.CopyFrom(dockerfile.StageOf("assets")),
+		)),
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := df.AddStage(
-		From(Scratch(), As("assets")),
-		Workdir("/build"),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("assets")),
+		instruction.Workdir("/build"),
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := df.AddStage(
-		From(StageOf("parent"), As("child")),
+		dockerfile.From(dockerfile.StageOf("parent"), dockerfile.As("child")),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -150,16 +156,17 @@ func TestOnBuildStageDependenciesAreResolvedWhenTriggered(t *testing.T) {
 }
 
 func TestCopyFromCreatesStageDependency(t *testing.T) {
-	df := New()
+	df := dockerfile.New()
 	if err := df.AddStage(
-		From(Scratch(), As("assets")),
-		Workdir("/build"),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("assets")),
+		instruction.Workdir("/build"),
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := df.AddStage(
-		From(Scratch(), As("final")),
-		Copy(Sources{"/out"}, "/app", CopyFrom(StageOf("assets"))),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("final")),
+		instruction.Copy(instruction.Sources{"/out"}, "/app",
+			instruction.CopyFrom(dockerfile.StageOf("assets"))),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -173,17 +180,18 @@ func TestCopyFromCreatesStageDependency(t *testing.T) {
 }
 
 func TestCopyFromStageNameCanExpandFromArg(t *testing.T) {
-	df := New()
+	df := dockerfile.New()
 	if err := df.AddStage(
-		From(Scratch(), As("assets")),
-		Workdir("/assets"),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("assets")),
+		instruction.Workdir("/assets"),
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := df.AddStage(
-		From(Scratch(), As("final")),
-		Arg("ASSET_STAGE", ArgDefault("assets")),
-		Copy(Sources{"/bundle"}, "/opt/bundle", CopyFrom(StageOf("$ASSET_STAGE"))),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("final")),
+		instruction.Arg("ASSET_STAGE", instruction.ArgDefault("assets")),
+		instruction.Copy(instruction.Sources{"/bundle"}, "/opt/bundle",
+			instruction.CopyFrom(dockerfile.StageOf("$ASSET_STAGE"))),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -197,15 +205,15 @@ func TestCopyFromStageNameCanExpandFromArg(t *testing.T) {
 }
 
 func TestImageResolverSuppliesOCIConfigAndShell(t *testing.T) {
-	image := emptyImage(testPlatform())
+	image := testImage()
 	image.Config.Env = []string{"BASE_SETTING=present"}
 	image.Config.WorkingDir = "/workspace"
 	image.Config.User = "1000:1000"
 	image.Config.Shell = []string{"/bin/bash", "-e", "-c"}
 
-	df := New(
-		WithPlatform(testPlatform()),
-		WithImageResolver(func(_ context.Context, reference string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
+	df := dockerfile.New(
+		dockerfile.WithPlatform(testPlatform()),
+		dockerfile.WithImageResolver(func(_ context.Context, reference string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
 			if reference != "example/base:latest" {
 				t.Fatalf("resolved image reference = %q", reference)
 			}
@@ -213,9 +221,9 @@ func TestImageResolverSuppliesOCIConfigAndShell(t *testing.T) {
 		}),
 	)
 	if err := df.AddStage(
-		From(Image("example/base:latest"), As("image")),
-		Run(Sh("echo $BASE_SETTING")),
-		Cmd(Sh("echo $BASE_SETTING")),
+		dockerfile.From(dockerfile.Image("example/base:latest"), dockerfile.As("image")),
+		instruction.Run(instruction.Sh("echo $BASE_SETTING")),
+		instruction.Cmd(instruction.Sh("echo $BASE_SETTING")),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -236,11 +244,11 @@ func TestImageResolverSuppliesOCIConfigAndShell(t *testing.T) {
 }
 
 func TestRejectsStageDependencyCycles(t *testing.T) {
-	df := New()
-	if err := df.AddStage(From(StageOf("b"), As("a"))); err != nil {
+	df := dockerfile.New()
+	if err := df.AddStage(dockerfile.From(dockerfile.StageOf("b"), dockerfile.As("a"))); err != nil {
 		t.Fatal(err)
 	}
-	if err := df.AddStage(From(StageOf("a"), As("b"))); err != nil {
+	if err := df.AddStage(dockerfile.From(dockerfile.StageOf("a"), dockerfile.As("b"))); err != nil {
 		t.Fatal(err)
 	}
 	_, err := df.Build(context.Background())
@@ -250,13 +258,13 @@ func TestRejectsStageDependencyCycles(t *testing.T) {
 }
 
 func TestVariableExpansionDoesNotConsumeBackslashesOrBackticks(t *testing.T) {
-	df := New()
+	df := dockerfile.New()
 	if err := df.AddStage(
-		From(Scratch(), As("escape")),
-		Env([]KeyValue{
-			KV("VALUE", "expanded"),
-			KV("WINDOWS_PATH", "C:\\$VALUE"),
-			KV("BACKTICK", "`$VALUE"),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("escape")),
+		instruction.Env([]instruction.KeyValue{
+			instruction.KV("VALUE", "expanded"),
+			instruction.KV("WINDOWS_PATH", "C:\\$VALUE"),
+			instruction.KV("BACKTICK", "`$VALUE"),
 		}),
 	); err != nil {
 		t.Fatal(err)
@@ -273,32 +281,17 @@ func TestVariableExpansionDoesNotConsumeBackslashesOrBackticks(t *testing.T) {
 	}
 }
 
-func TestDefaultShellAndEntrypointCmdInheritance(t *testing.T) {
-	linux, err := commandArgs(Sh("echo ok"), nil, "linux")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(linux) != 3 || linux[0] != "/bin/sh" || linux[1] != "-c" {
-		t.Fatalf("Linux default shell = %#v", linux)
-	}
-	windows, err := commandArgs(Sh("echo ok"), nil, "windows")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(windows) != 3 || windows[0] != "cmd" || windows[1] != "/S" || windows[2] != "/C" {
-		t.Fatalf("Windows default shell = %#v", windows)
-	}
-
-	df := New()
+func TestEntrypointClearsInheritedCmd(t *testing.T) {
+	df := dockerfile.New()
 	if err := df.AddStage(
-		From(Scratch(), As("base")),
-		Cmd(Exec("old")),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("base")),
+		instruction.Cmd(instruction.Exec("old")),
 	); err != nil {
 		t.Fatal(err)
 	}
 	if err := df.AddStage(
-		From(StageOf("base"), As("derived")),
-		Entrypoint(Exec("entry")),
+		dockerfile.From(dockerfile.StageOf("base"), dockerfile.As("derived")),
+		instruction.Entrypoint(instruction.Exec("entry")),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -312,25 +305,25 @@ func TestDefaultShellAndEntrypointCmdInheritance(t *testing.T) {
 }
 
 func TestRunMountsAndExecutionOptions(t *testing.T) {
-	df := New()
+	df := dockerfile.New()
 	if err := df.AddStage(
-		From(Scratch()),
-		Run(
-			Sh("go test ./..."),
-			Mounts(
-				Bind("/src", nil, ".", false),
-				Cache("/root/.cache", CacheID("go-build"), CacheSharing(llb.CacheMountLocked)),
-				Cache("/go/pkg/mod", CacheID("go-mod"), CacheOwnership(1000, 1000, 0o755)),
-				Tmpfs("/tmp", 64<<20),
-				Secret("token", "/run/secrets/token", SecretRequired()),
-				Secret("registry-password", "", SecretEnv("REGISTRY_PASSWORD"), SecretOptional()),
-				SSH("default", "", SSHSocket(1000, 1000, 0o600)),
+		dockerfile.From(dockerfile.Scratch()),
+		instruction.Run(
+			instruction.Sh("go test ./..."),
+			instruction.Mounts(
+				instruction.Bind("/src", nil, ".", false),
+				instruction.Cache("/root/.cache", instruction.CacheID("go-build"), instruction.CacheSharing(llb.CacheMountLocked)),
+				instruction.Cache("/go/pkg/mod", instruction.CacheID("go-mod"), instruction.CacheOwnership(1000, 1000, 0o755)),
+				instruction.Tmpfs("/tmp", 64<<20),
+				instruction.Secret("token", "/run/secrets/token", instruction.SecretRequired()),
+				instruction.Secret("registry-password", "", instruction.SecretEnv("REGISTRY_PASSWORD"), instruction.SecretOptional()),
+				instruction.SSH("default", "", instruction.SSHSocket(1000, 1000, 0o600)),
 			),
-			Network(NetworkNone),
-			Security(SecurityInsecure),
-			ReadOnlyRootFS(),
-			Devices(Device("vendor.example/device=accelerator", true)),
-			Ulimits(Ulimit{Name: llb.UlimitName("nofile"), Soft: 1024, Hard: 2048}),
+			instruction.Network(instruction.NetworkNone),
+			instruction.Security(instruction.SecurityInsecure),
+			instruction.ReadOnlyRootFS(),
+			instruction.Devices(instruction.Device("vendor.example/device=accelerator", true)),
+			instruction.Ulimits(instruction.Ulimit{Name: llb.UlimitName("nofile"), Soft: 1024, Hard: 2048}),
 		),
 	); err != nil {
 		t.Fatal(err)
@@ -341,7 +334,7 @@ func TestRunMountsAndExecutionOptions(t *testing.T) {
 }
 
 func TestInstructionClosureUpdatesLLBAndImageConfig(t *testing.T) {
-	custom := NewInstruction("ANNOTATE", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	custom := dockerfile.NewInstruction("ANNOTATE", func(_ context.Context, state dockerfile.State, _ *dockerfile.Runtime, _ dockerfile.InstructionMetadata) (dockerfile.State, error) {
 		state.LLB = state.LLB.AddEnv("CUSTOM_VALUE", "present")
 		if state.Env == nil {
 			state.Env = make(map[string]string)
@@ -351,10 +344,10 @@ func TestInstructionClosureUpdatesLLBAndImageConfig(t *testing.T) {
 			state.Image.Config.Labels = make(map[string]string)
 		}
 		state.Image.Config.Labels["example.com/custom"] = "present"
-		return nil
-	}, WithDescription("ANNOTATE custom metadata"), WithProgressGroup("custom"))
-	df := New()
-	if err := df.AddStage(From(Scratch(), As("custom")), custom); err != nil {
+		return state, nil
+	}, dockerfile.WithDescription("ANNOTATE custom metadata"), dockerfile.WithProgressGroup("custom"))
+	df := dockerfile.New()
+	if err := df.AddStage(dockerfile.From(dockerfile.Scratch(), dockerfile.As("custom")), custom); err != nil {
 		t.Fatal(err)
 	}
 	result, err := df.Build(context.Background())
@@ -371,20 +364,20 @@ func TestInstructionClosureUpdatesLLBAndImageConfig(t *testing.T) {
 
 func TestInstructionApplyRollsBackStateOnError(t *testing.T) {
 	wantErr := errors.New("deliberate failure")
-	instruction := NewInstruction("FAIL", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	action := dockerfile.NewInstruction("FAIL", func(_ context.Context, state dockerfile.State, _ *dockerfile.Runtime, _ dockerfile.InstructionMetadata) (dockerfile.State, error) {
 		state.Env["LEAK"] = "no"
 		if state.Image.Config.Labels == nil {
 			state.Image.Config.Labels = make(map[string]string)
 		}
 		state.Image.Config.Labels["leak"] = "no"
 		state.LLB = state.LLB.AddEnv("LEAK", "no")
-		return wantErr
+		return state, wantErr
 	})
-	initial := State{
-		LLB: llb.Scratch(), Image: emptyImage(testPlatform()),
+	initial := dockerfile.State{
+		LLB: llb.Scratch(), Image: testImage(),
 		Env: map[string]string{"KEEP": "yes"},
 	}
-	next, err := instruction.Apply(context.Background(), initial, nil)
+	next, err := action.Apply(context.Background(), initial, nil)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("error = %v, want %v", err, wantErr)
 	}
@@ -401,29 +394,29 @@ func TestInstructionApplyRollsBackStateOnError(t *testing.T) {
 
 func TestInstructionAndStageHooksAreScoped(t *testing.T) {
 	var sequence []string
-	instruction := NewInstruction("MARK", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	action := dockerfile.NewInstruction("MARK", func(_ context.Context, state dockerfile.State, _ *dockerfile.Runtime, _ dockerfile.InstructionMetadata) (dockerfile.State, error) {
 		state.Image.Author = "test"
-		return nil
-	}, WithInstructionHooks(InstructionHooks{
-		Before: func(context.Context, InstructionEvent) error {
+		return state, nil
+	}, dockerfile.WithInstructionHooks(dockerfile.InstructionHooks{
+		Before: func(context.Context, dockerfile.InstructionEvent) error {
 			sequence = append(sequence, "instruction-before")
 			return nil
 		},
-		After: func(context.Context, InstructionEvent) error {
+		After: func(context.Context, dockerfile.InstructionEvent) error {
 			sequence = append(sequence, "instruction-after")
 			return nil
 		},
 	}))
-	df := New()
-	if err := df.AddStagePlan(Plan(
-		From(Scratch(), As("hooks")),
-		[]Instruction{instruction},
-		WithStageHooks(StageHooks{
-			Before: func(context.Context, StageEvent) error {
+	df := dockerfile.New()
+	if err := df.AddStagePlan(dockerfile.Plan(
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("hooks")),
+		[]dockerfile.Instruction{action},
+		dockerfile.WithStageHooks(dockerfile.StageHooks{
+			Before: func(context.Context, dockerfile.StageEvent) error {
 				sequence = append(sequence, "stage-before")
 				return nil
 			},
-			After: func(context.Context, StageEvent) error {
+			After: func(context.Context, dockerfile.StageEvent) error {
 				sequence = append(sequence, "stage-after")
 				return nil
 			},
@@ -440,24 +433,23 @@ func TestInstructionAndStageHooksAreScoped(t *testing.T) {
 	}
 }
 
-func TestProgressIncludesInstructionAndStageTotals(t *testing.T) {
+func TestProgressIncludesStageAndInstructionTotals(t *testing.T) {
 	var events []progress.Event
-	df := New(WithProgressReporter(progress.ReporterFunc(func(_ context.Context, event progress.Event) error {
+	df := dockerfile.New(dockerfile.WithProgressReporter(progress.ReporterFunc(func(_ context.Context, event progress.Event) error {
 		events = append(events, event)
 		return nil
 	})))
 	if err := df.AddStage(
-		From(Scratch(), As("progress")),
-		Env([]KeyValue{KV("A", "1")}),
-		Run(Exec("true")),
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("progress")),
+		instruction.Env([]instruction.KeyValue{instruction.KV("A", "1")}),
+		instruction.Run(instruction.Exec("true")),
 	); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := df.Build(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	started := 0
-	completed := 0
+	started, completed := 0, 0
 	for _, event := range events {
 		if event.StageName != "progress" {
 			continue
@@ -482,4 +474,11 @@ func TestProgressIncludesInstructionAndStageTotals(t *testing.T) {
 
 func testPlatform() ocispecs.Platform {
 	return ocispecs.Platform{OS: "linux", Architecture: "amd64"}
+}
+
+func testImage() dockerspec.DockerOCIImage {
+	image := dockerspec.DockerOCIImage{OS: "linux", Architecture: "amd64"}
+	image.RootFS.Type = "layers"
+	image.Config.WorkingDir = "/"
+	return image
 }

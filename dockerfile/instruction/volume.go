@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 // Volume declares image-level volume paths.
 func Volume(paths ...string) Instruction {
 	values := append([]string(nil), paths...)
-	return NewInstruction("VOLUME", func(_ context.Context, state *State, runtime *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("VOLUME", func(_ context.Context, state *State, runtime *Runtime, _ InstructionMetadata) error {
 		if runtime == nil {
 			return errors.New("VOLUME requires a build runtime")
 		}

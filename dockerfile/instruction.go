@@ -13,7 +13,9 @@ import (
 // arguments in this closure; Apply supplies the current LLB and image state.
 // An action must update both State.LLB and State.Image when the instruction
 // changes both representations.
-type InstructionAction func(context.Context, *State, *Runtime, InstructionMetadata) error
+type InstructionAction func(context.Context, State, *Runtime, InstructionMetadata) (State, error)
+
+type instructionMutation func(context.Context, *State, *Runtime, InstructionMetadata) error
 
 // Instruction is a named closure plus the metadata needed by the Dockerfile
 // evaluator. It is intentionally a concrete value, not a handler interface or
@@ -23,20 +25,33 @@ type Instruction struct {
 	action       InstructionAction
 	metadata     InstructionMetadata
 	dependencies []StageName
-	globalARG    bool
 }
 
-// NewInstruction creates a custom instruction from a state-transforming
-// closure. Options attach instruction-local progress, history, LLB and hook
-// metadata. The closure receives a private candidate state; failures do not
-// partially mutate the caller's state.
+// NewInstruction creates a pure state-transition instruction. The closure
+// receives a detached snapshot of the current state and returns its successor.
+// The evaluator supplies a clone, so mutating the snapshot cannot alter the
+// caller's state even when the action returns an error.
 func NewInstruction(name string, action InstructionAction, options ...InstructionOption) Instruction {
 	instruction := Instruction{name: name, action: action}
-	instruction = instruction.With(options...)
-	return instruction
+	return instruction.With(options...)
+}
+
+// newMutationInstruction adapts concise in-place state edits used by built-in
+// operations to the public input/output transition contract.
+func newMutationInstruction(name string, mutation instructionMutation, options ...InstructionOption) Instruction {
+	return NewInstruction(name, func(ctx context.Context, current State, runtime *Runtime, metadata InstructionMetadata) (State, error) {
+		next := current
+		if err := mutation(ctx, &next, runtime, metadata); err != nil {
+			return current, err
+		}
+		return next, nil
+	}, options...)
 }
 
 func (i Instruction) Name() string { return i.name }
+
+// Valid reports whether the instruction has a usable transition closure.
+func (i Instruction) Valid() bool { return i.name != "" && i.action != nil }
 
 func (i Instruction) String() string {
 	if i.metadata.Description != "" {
@@ -77,10 +92,12 @@ func (i Instruction) Apply(ctx context.Context, current State, runtime *Runtime)
 
 	candidate := current.Clone()
 	metadata := cloneInstructionMetadata(i.metadata)
-	if err := i.action(ctx, &candidate, runtime, metadata); err != nil {
+	next, err := i.action(ctx, candidate, runtime, metadata)
+	if err != nil {
 		return current, fmt.Errorf("%s: %w", i.name, err)
 	}
-	next, err := appendHistory(ctx, current, candidate, i, metadata, runtime)
+	next = next.Clone()
+	next, err = appendHistory(ctx, current, next, i, metadata, runtime)
 	if err != nil {
 		return current, err
 	}
@@ -150,7 +167,8 @@ type InstructionMetadata struct {
 	HistoryMode       HistoryMode
 	History           HistoryFunc
 	DeferredDependencies bool
-	Hooks             InstructionHooks
+	GlobalARG             bool
+	Hooks                 InstructionHooks
 	OnBuildExpression func() (string, error)
 }
 

@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"errors"
@@ -127,7 +127,7 @@ func SecretFile(uid, gid int, mode os.FileMode) SecretOption {
 type SSHOption func(*SSHMount)
 
 func SSH(id, target string, options ...SSHOption) Mount {
-	config := SSHMount{ID: id, Target: target, Required: true, Mode: 0o600}
+	config := SSHMount{ID: id, Target: target, Required: false, Mode: 0o600}
 	for _, option := range options {
 		if option != nil {
 			option(&config)
@@ -207,7 +207,7 @@ func runMountOptions(runtime *Runtime, state *State, mount Mount) ([]llb.RunOpti
 			}
 			source = source.File(
 				llb.Mkdir(sourcePath, mode, llb.WithParents(true), ownership),
-				runtimeConstraints(runtime, InstructionMetadata{})...,
+				RuntimeConstraints(runtime, InstructionMetadata{})...,
 			)
 		}
 		id := value.ID

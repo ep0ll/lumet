@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -43,7 +43,7 @@ func UDPRange(from, to uint16) PortRange {
 // Expose adds port metadata to the image config. It has no filesystem effect.
 func Expose(ports ...ExposedPort) Instruction {
 	values := append([]ExposedPort(nil), ports...)
-	return NewInstruction("EXPOSE", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("EXPOSE", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
 		if len(values) == 0 {
 			return errors.New("EXPOSE requires at least one port")
 		}

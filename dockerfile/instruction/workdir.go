@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 // The target directory is created when it does not already exist.
 func Workdir(directory string) Instruction {
 	description := "WORKDIR " + directory
-	return NewInstruction("WORKDIR", func(_ context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
+	return newMutationInstruction("WORKDIR", func(_ context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
 		if runtime == nil {
 			return errors.New("WORKDIR requires a build runtime")
 		}
@@ -42,7 +42,7 @@ func Workdir(directory string) Instruction {
 		if runtime.CreatedAt != nil {
 			mkdirOptions = append(mkdirOptions, llb.WithCreatedTime(*runtime.CreatedAt))
 		}
-		constraints := operationConstraints(runtime, state, metadata, description)
+		constraints := OperationConstraints(runtime, state, metadata, description)
 		state.LLB = state.LLB.File(
 			llb.Mkdir(system.ToSlash(normalized, state.Platform.OS), 0o755, mkdirOptions...),
 			constraints...,

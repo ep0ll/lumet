@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -90,7 +90,7 @@ func Add(sources []AddSource, destination string, options ...AddOption) Instruct
 	sources = append([]AddSource(nil), sources...)
 	description := fmt.Sprintf("ADD %v %s", sources, destination)
 
-	instruction := NewInstruction("ADD", func(_ context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
+	instruction := newMutationInstruction("ADD", func(_ context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
 		if runtime == nil {
 			return errors.New("ADD requires a build runtime")
 		}
@@ -134,7 +134,7 @@ func Add(sources []AddSource, destination string, options ...AddOption) Instruct
 			}
 		}
 
-		constraints := operationConstraints(runtime, state, metadata, description)
+		constraints := OperationConstraints(runtime, state, metadata, description)
 		if config.fileOptions.Link {
 			copyState := llb.Scratch().Platform(state.Platform).
 				Dir(state.Image.Config.WorkingDir).

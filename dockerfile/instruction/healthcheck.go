@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -51,7 +51,7 @@ func Healthcheck(command Command, options ...HealthcheckOption) Instruction {
 			option(&config)
 		}
 	}
-	return NewInstruction("HEALTHCHECK", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("HEALTHCHECK", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
 		if config.None {
 			state.Image.Config.Healthcheck = &dockerspec.HealthcheckConfig{Test: []string{"NONE"}}
 			return nil

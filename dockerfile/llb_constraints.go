@@ -7,7 +7,7 @@ import (
 	"github.com/moby/buildkit/client/llb"
 )
 
-func runtimeConstraints(runtime *Runtime, metadata InstructionMetadata) []llb.ConstraintsOpt {
+func RuntimeConstraints(runtime *Runtime, metadata InstructionMetadata) []llb.ConstraintsOpt {
 	var options []llb.ConstraintsOpt
 	if runtime != nil {
 		options = append(options, runtime.Constraints...)
@@ -18,8 +18,8 @@ func runtimeConstraints(runtime *Runtime, metadata InstructionMetadata) []llb.Co
 
 // operationConstraints adds scoped BuildKit constraints and a stable progress
 // description to filesystem operations.
-func operationConstraints(runtime *Runtime, state *State, metadata InstructionMetadata, fallback string) []llb.ConstraintsOpt {
-	options := runtimeConstraints(runtime, metadata)
+func OperationConstraints(runtime *Runtime, state *State, metadata InstructionMetadata, fallback string) []llb.ConstraintsOpt {
+	options := RuntimeConstraints(runtime, metadata)
 	title := metadata.CustomName
 	if title == "" {
 		title = metadata.ProgressTitle
@@ -27,10 +27,10 @@ func operationConstraints(runtime *Runtime, state *State, metadata InstructionMe
 	if title == "" {
 		title = fallback
 	}
-	return append(options, llb.WithCustomName(buildkitCustomName(runtime, state, title)))
+	return append(options, llb.WithCustomName(BuildKitCustomName(runtime, state, title)))
 }
 
-func buildkitCustomName(runtime *Runtime, state *State, title string) string {
+func BuildKitCustomName(runtime *Runtime, state *State, title string) string {
 	parts := make([]string, 0, 3)
 	if state != nil && state.Platform.OS != "" && state.Platform.Architecture != "" {
 		platform := state.Platform.OS + "/" + state.Platform.Architecture

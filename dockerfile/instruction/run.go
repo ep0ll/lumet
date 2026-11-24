@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -106,7 +106,7 @@ func Run(command Command, options ...RunOption) Instruction {
 	config.dependencies = uniqueStageNames(config.dependencies)
 
 	description := "RUN " + formatCommand(command)
-	instruction := NewInstruction("RUN", func(_ context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
+	instruction := newMutationInstruction("RUN", func(_ context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
 		args, err := commandArgs(config.command, state.Image.Config.Shell, state.Platform.OS)
 		if err != nil {
 			return err
@@ -121,7 +121,7 @@ func Run(command Command, options ...RunOption) Instruction {
 		if title == "" {
 			title = description
 		}
-		options = append(options, llb.WithCustomName(buildkitCustomName(runtime, state, title)))
+		options = append(options, llb.WithCustomName(BuildKitCustomName(runtime, state, title)))
 
 		for _, mount := range config.mounts {
 			mountOptions, err := runMountOptions(runtime, state, mount)
@@ -175,7 +175,7 @@ func Run(command Command, options ...RunOption) Instruction {
 			options = append(options, llb.ReadonlyRootFS())
 		}
 		options = append(options, config.options...)
-		for _, constraint := range runtimeConstraints(runtime, metadata) {
+		for _, constraint := range RuntimeConstraints(runtime, metadata) {
 			options = append(options, constraint)
 		}
 		state.LLB = state.LLB.Run(options...).Root()

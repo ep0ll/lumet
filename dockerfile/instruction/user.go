@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func User(user Principal, options ...UserOption) Instruction {
 		}
 	}
 	description := "USER " + principalString(user)
-	return NewInstruction("USER", func(_ context.Context, state *State, runtime *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("USER", func(_ context.Context, state *State, runtime *Runtime, _ InstructionMetadata) error {
 		value := principalString(user)
 		if config.group != nil {
 			value += ":" + principalString(*config.group)

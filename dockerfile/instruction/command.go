@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 // Maintainer updates the image author field.
 func Maintainer(name string) Instruction {
-	return NewInstruction("MAINTAINER", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("MAINTAINER", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
 		if strings.TrimSpace(name) == "" {
 			return errors.New("MAINTAINER cannot be empty")
 		}
@@ -27,7 +27,7 @@ func Maintainer(name string) Instruction {
 func Cmd(command Command) Instruction {
 	command = cloneCommand(command)
 	description := "CMD " + formatCommand(command)
-	return NewInstruction("CMD", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("CMD", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
 		args, err := commandArgs(command, state.Image.Config.Shell, state.Platform.OS)
 		if err != nil {
 			return err
@@ -51,7 +51,7 @@ func Cmd(command Command) Instruction {
 func Entrypoint(command Command) Instruction {
 	command = cloneCommand(command)
 	description := "ENTRYPOINT " + formatCommand(command)
-	return NewInstruction("ENTRYPOINT", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("ENTRYPOINT", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
 		args, err := commandArgs(command, state.Image.Config.Shell, state.Platform.OS)
 		if err != nil {
 			return err
@@ -75,7 +75,7 @@ func Entrypoint(command Command) Instruction {
 // Shell sets the shell used by subsequent shell-form RUN, CMD and ENTRYPOINT.
 func Shell(shell ExecForm) Instruction {
 	value := append(ExecForm(nil), shell...)
-	return NewInstruction("SHELL", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("SHELL", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
 		if len(value) == 0 || strings.TrimSpace(value[0]) == "" {
 			return errors.New("SHELL requires a non-empty executable")
 		}

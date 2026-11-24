@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -35,7 +35,7 @@ func Arg(name string, options ...ArgOption) Instruction {
 	if config.defaultValue != nil {
 		description += "=" + *config.defaultValue
 	}
-	instruction := NewInstruction("ARG", func(_ context.Context, state *State, runtime *Runtime, _ InstructionMetadata) error {
+	instruction := newMutationInstruction("ARG", func(_ context.Context, state *State, runtime *Runtime, _ InstructionMetadata) error {
 		if runtime == nil {
 			return errors.New("ARG requires a build runtime")
 		}
@@ -92,8 +92,7 @@ func Arg(name string, options ...ArgOption) Instruction {
 			}
 			return "ARG " + name + "=" + dockerWord(*config.defaultValue), nil
 		}))
-	instruction.globalARG = true
-	return instruction
+	return instruction.With(WithGlobalARG())
 }
 
 func validVariableName(name string) bool {

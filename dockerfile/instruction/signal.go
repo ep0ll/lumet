@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -24,7 +24,7 @@ func SignalNumber(number uint8) Signal { return Signal(strconv.Itoa(int(number))
 
 // StopSignal updates the image's stop signal without changing LLB filesystem state.
 func StopSignal(signal Signal) Instruction {
-	return NewInstruction("STOPSIGNAL", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("STOPSIGNAL", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
 		if signal == "" {
 			return errors.New("STOPSIGNAL cannot be empty")
 		}

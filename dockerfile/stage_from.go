@@ -65,11 +65,11 @@ func From(base Base, options ...StageFromOption) StageFrom {
 		}
 	}
 	dependencies := uniqueStageNames(append(baseDependencies(base), config.metadata.Dependencies...))
-	action := func(ctx context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
+	instruction := newMutationInstruction("FROM", func(ctx context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
 		return initializeFrom(ctx, state, runtime, metadata, base, config)
-	}
+	})
 	return StageFrom{
-		name: config.name, platform: config.platform, action: action,
+		name: config.name, platform: config.platform, action: instruction.action,
 		metadata: cloneInstructionMetadata(config.metadata),
 		dependencies: dependencies,
 	}
@@ -86,12 +86,12 @@ func ResetStage(base Base, options ...StageFromOption) StageFrom {
 			option(&config)
 		}
 	}
-	dependencies := baseDependencies(base)
-	action := func(ctx context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
+	dependencies := uniqueStageNames(append(baseDependencies(base), config.metadata.Dependencies...))
+	instruction := newMutationInstruction("FROM", func(ctx context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
 		return initializeFrom(ctx, state, runtime, metadata, base, config)
-	}
+	})
 	return StageFrom{
-		name: config.name, platform: config.platform, action: action,
+		name: config.name, platform: config.platform, action: instruction.action,
 		metadata: cloneInstructionMetadata(config.metadata),
 		dependencies: dependencies,
 	}
@@ -154,13 +154,14 @@ func (from StageFrom) Apply(ctx context.Context, runtime *Runtime) (State, error
 	if from.name != "" {
 		state.StageName = from.name
 	}
-	if err := from.action(ctx, &state, runtime, cloneInstructionMetadata(from.metadata)); err != nil {
+	next, err := from.action(ctx, state, runtime, cloneInstructionMetadata(from.metadata))
+	if err != nil {
 		return State{}, fmt.Errorf("FROM %s: %w", from.name, err)
 	}
 	if from.name != "" {
-		state.StageName = from.name
+		next.StageName = from.name
 	}
-	return state, nil
+	return next, nil
 }
 
 func fromEmptyState(runtime *Runtime) llb.State {

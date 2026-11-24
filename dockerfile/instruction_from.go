@@ -63,8 +63,8 @@ func initializeFrom(
 		if customName == "" {
 			customName = "FROM " + ref
 		}
-		constraints := runtimeConstraints(runtime, metadata)
-		constraints = append(constraints, llb.WithCustomName(buildkitCustomName(runtime, &State{Platform: platform, StageName: state.StageName}, customName)))
+		constraints := RuntimeConstraints(runtime, metadata)
+		constraints = append(constraints, llb.WithCustomName(BuildKitCustomName(runtime, &State{Platform: platform, StageName: state.StageName}, customName)))
 		for _, constraint := range constraints {
 			imageOptions = append(imageOptions, constraint)
 		}

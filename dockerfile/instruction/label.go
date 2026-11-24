@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 // Label modifies image config metadata without changing the filesystem state.
 func Label(values []KeyValue) Instruction {
 	pairs := append([]KeyValue(nil), values...)
-	return NewInstruction("LABEL", func(_ context.Context, state *State, runtime *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("LABEL", func(_ context.Context, state *State, runtime *Runtime, _ InstructionMetadata) error {
 		if len(pairs) == 0 {
 			return errors.New("LABEL requires at least one key/value pair")
 		}

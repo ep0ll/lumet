@@ -149,7 +149,7 @@ func (d *Dockerfile) AddGlobal(instructions ...Instruction) error {
 		if instruction.name == "" || instruction.action == nil {
 			return errors.New("dockerfile: invalid global instruction")
 		}
-		if !instruction.globalARG {
+		if !instruction.Metadata().GlobalARG {
 			return fmt.Errorf("dockerfile: %s is not permitted in global scope", instruction.name)
 		}
 		d.global = append(d.global, instruction)

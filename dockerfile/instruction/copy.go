@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -84,7 +84,7 @@ func Copy(sources Sources, destination string, options ...CopyOption) Instructio
 		dependencies = append(dependencies, stage.Name)
 	}
 
-	instruction := NewInstruction("COPY", func(_ context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
+	instruction := newMutationInstruction("COPY", func(_ context.Context, state *State, runtime *Runtime, metadata InstructionMetadata) error {
 		if runtime == nil {
 			return errors.New("COPY requires a build runtime")
 		}
@@ -133,7 +133,7 @@ func Copy(sources Sources, destination string, options ...CopyOption) Instructio
 			}
 		}
 
-		constraints := operationConstraints(runtime, state, metadata, description)
+		constraints := OperationConstraints(runtime, state, metadata, description)
 		if config.fileOptions.Link {
 			copyState := llb.Scratch().Platform(state.Platform).
 				Dir(state.Image.Config.WorkingDir).

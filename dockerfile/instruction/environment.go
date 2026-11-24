@@ -1,4 +1,4 @@
-package dockerfile
+package instruction
 
 import (
 	"context"
@@ -20,7 +20,7 @@ func KV(key, value string) KeyValue { return KeyValue{Key: key, Value: value} }
 func Env(values []KeyValue) Instruction {
 	pairs := append([]KeyValue(nil), values...)
 	description := "ENV " + formatKeyValues(pairs)
-	return NewInstruction("ENV", func(_ context.Context, state *State, runtime *Runtime, _ InstructionMetadata) error {
+	return newMutationInstruction("ENV", func(_ context.Context, state *State, runtime *Runtime, _ InstructionMetadata) error {
 		if runtime == nil {
 			return errors.New("ENV requires a build runtime")
 		}
