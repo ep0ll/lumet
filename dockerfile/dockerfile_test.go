@@ -2,145 +2,484 @@ package dockerfile
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/moby/buildkit/client/llb"
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/ep0ll/lumet/dockerfile/progress"
 )
 
-func TestDockerfileExpandsGlobalArgInFromAndStageEnv(t *testing.T) {
-	df := New()
-	if err := df.AddGlobal(Arg("BASE", ArgDefault("alpine:3.21"))); err != nil { t.Fatal(err) }
+func TestGlobalArgExpansionAndImageStateTransitions(t *testing.T) {
+	df := New(
+		WithPlatform(testPlatform()),
+		WithImageResolver(func(_ context.Context, reference string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
+			if reference != "alpine:3.21" {
+				t.Fatalf("image reference = %q", reference)
+			}
+			return emptyImage(testPlatform()), nil
+		}),
+	)
+	if err := df.AddGlobal(Arg("BASE", ArgDefault("alpine:3.21"))); err != nil {
+		t.Fatal(err)
+	}
 	if err := df.AddStage(
 		From(Image("$BASE"), As("build")),
+		Arg("APP_VERSION", ArgDefault("1.0")),
 		Env([]KeyValue{KV("APP", "service")}),
-		Workdir("/opt/$APP"),
-	); err != nil { t.Fatal(err) }
+		Env([]KeyValue{KV("APP_HOME", "/opt/$APP")}),
+		Workdir("$APP_HOME"),
+		Expose(TCP(8080), UDP(5353)),
+		Volume("/var/lib/$APP"),
+		Label([]KeyValue{KV("org.example.version", "$APP_VERSION")}),
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	result, err := df.Build(context.Background())
-	if err != nil { t.Fatal(err) }
-	if got := result.Target.Base.Ref; got != "alpine:3.21" { t.Fatalf("base ref = %q", got) }
-	if got := result.Target.Image.Config.WorkingDir; got != "/opt/service" { t.Fatalf("working dir = %q", got) }
-	if got := result.Target.Env["APP"]; got != "service" { t.Fatalf("APP = %q", got) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := result.Target.BaseRef; got != "alpine:3.21" {
+		t.Fatalf("base ref = %q", got)
+	}
+	if got := result.Target.Image.Config.WorkingDir; got != "/opt/service" {
+		t.Fatalf("working directory = %q", got)
+	}
+	if got := result.Target.Env["APP"]; got != "service" {
+		t.Fatalf("APP = %q", got)
+	}
+	if got := result.Target.Image.Config.Labels["org.example.version"]; got != "1.0" {
+		t.Fatalf("label version = %q", got)
+	}
+	if _, ok := result.Target.Image.Config.ExposedPorts["8080/tcp"]; !ok {
+		t.Fatal("TCP port missing from image config")
+	}
+	if _, ok := result.Target.Image.Config.ExposedPorts["5353/udp"]; !ok {
+		t.Fatal("UDP port missing from image config")
+	}
+	if _, ok := result.Target.Image.Config.Volumes["/var/lib/service"]; !ok {
+		t.Fatal("volume missing from image config")
+	}
 }
 
-func TestDockerfileOnBuildRunsInDerivedStageOnly(t *testing.T) {
+func TestEnvPairsExpandAgainstPreInstructionEnvironment(t *testing.T) {
+	df := New()
+	if err := df.AddStage(
+		From(Scratch(), As("env")),
+		Env([]KeyValue{
+			KV("A", "first"),
+			KV("B", "$A"),
+		}),
+	); err != nil {
+		t.Fatal(err)
+	}
+	result, err := df.Build(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := result.Target.Env["B"]; got != "" {
+		t.Fatalf("B should not see another assignment from the same ENV instruction, got %q", got)
+	}
+}
+
+func TestOnBuildIsRecordedThenExecutedInDerivedStage(t *testing.T) {
 	df := New()
 	if err := df.AddStage(
 		From(Scratch(), As("parent")),
 		OnBuild(Env([]KeyValue{KV("TRIGGERED", "yes")})),
-	); err != nil { t.Fatal(err) }
+	); err != nil {
+		t.Fatal(err)
+	}
 	if err := df.AddStage(
 		From(StageOf("parent"), As("child")),
 		Env([]KeyValue{KV("CHILD", "$TRIGGERED")}),
-	); err != nil { t.Fatal(err) }
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	result, err := df.Build(context.Background())
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	parent := result.Stages["parent"]
 	child := result.Stages["child"]
 	if got := parent.Image.Config.OnBuild; len(got) != 1 || got[0] != "ENV TRIGGERED=yes" {
-		t.Fatalf("parent ONBUILD = %#v", got)
+		t.Fatalf("parent ONBUILD metadata = %#v", got)
 	}
-	if len(child.Image.Config.OnBuild) != 0 { t.Fatalf("child ONBUILD was not consumed: %#v", child.Image.Config.OnBuild) }
-	if got := child.Env["TRIGGERED"]; got != "yes" { t.Fatalf("trigger did not run: %q", got) }
-	if got := child.Env["CHILD"]; got != "yes" { t.Fatalf("child ENV did not see trigger environment: %q", got) }
+	if len(child.Image.Config.OnBuild) != 0 {
+		t.Fatalf("derived stage did not consume ONBUILD metadata: %#v", child.Image.Config.OnBuild)
+	}
+	if got := child.Env["TRIGGERED"]; got != "yes" {
+		t.Fatalf("ONBUILD trigger did not execute: %q", got)
+	}
+	if got := child.Env["CHILD"]; got != "yes" {
+		t.Fatalf("child ENV did not see trigger environment: %q", got)
+	}
 }
 
-func TestDockerfileResolvesCopyFromDependency(t *testing.T) {
+func TestOnBuildStageDependenciesAreResolvedWhenTriggered(t *testing.T) {
 	df := New()
-	if err := df.AddStage(From(Scratch(), As("assets")), Workdir("/build")); err != nil { t.Fatal(err) }
+	if err := df.AddStage(
+		From(Scratch(), As("parent")),
+		OnBuild(Copy(Sources{"/artifact"}, "/opt/artifact", CopyFrom(StageOf("assets")))),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := df.AddStage(
+		From(Scratch(), As("assets")),
+		Workdir("/build"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := df.AddStage(
+		From(StageOf("parent"), As("child")),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := df.Build(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := result.Stages["assets"]; !ok {
+		t.Fatal("stage referenced by ONBUILD was not evaluated")
+	}
+}
+
+func TestCopyFromCreatesStageDependency(t *testing.T) {
+	df := New()
+	if err := df.AddStage(
+		From(Scratch(), As("assets")),
+		Workdir("/build"),
+	); err != nil {
+		t.Fatal(err)
+	}
 	if err := df.AddStage(
 		From(Scratch(), As("final")),
 		Copy(Sources{"/out"}, "/app", CopyFrom(StageOf("assets"))),
-	); err != nil { t.Fatal(err) }
+	); err != nil {
+		t.Fatal(err)
+	}
 	result, err := df.Build(context.Background())
-	if err != nil { t.Fatal(err) }
-	if _, ok := result.Stages["assets"]; !ok { t.Fatal("COPY --from dependency was not evaluated") }
-	if result.Target.State.Output() == nil { t.Fatal("expected final LLB state output") }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := result.Stages["assets"]; !ok {
+		t.Fatal("COPY --from dependency was not evaluated")
+	}
 }
 
-func TestDockerfileRejectsStageDependencyCycle(t *testing.T) {
-	df := New()
-	if err := df.AddStage(From(StageOf("b"), As("a"))); err != nil { t.Fatal(err) }
-	if err := df.AddStage(From(StageOf("a"), As("b"))); err != nil { t.Fatal(err) }
-	_, err := df.Build(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "circular stage dependency") { t.Fatalf("expected cycle error, got %v", err) }
-}
-
-func TestFunctionalExpansionDoesNotTreatEscapeCharactersAsSyntax(t *testing.T) {
+func TestCopyFromStageNameCanExpandFromArg(t *testing.T) {
 	df := New()
 	if err := df.AddStage(
-		From(Scratch(), As("test")),
+		From(Scratch(), As("assets")),
+		Workdir("/assets"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := df.AddStage(
+		From(Scratch(), As("final")),
+		Arg("ASSET_STAGE", ArgDefault("assets")),
+		Copy(Sources{"/bundle"}, "/opt/bundle", CopyFrom(StageOf("$ASSET_STAGE"))),
+	); err != nil {
+		t.Fatal(err)
+	}
+	result, err := df.Build(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := result.Stages["assets"]; !ok {
+		t.Fatal("stage selected by expanded COPY --from was not resolved")
+	}
+}
+
+func TestImageResolverSuppliesOCIConfigAndShell(t *testing.T) {
+	image := emptyImage(testPlatform())
+	image.Config.Env = []string{"BASE_SETTING=present"}
+	image.Config.WorkingDir = "/workspace"
+	image.Config.User = "1000:1000"
+	image.Config.Shell = []string{"/bin/bash", "-e", "-c"}
+
+	df := New(
+		WithPlatform(testPlatform()),
+		WithImageResolver(func(_ context.Context, reference string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
+			if reference != "example/base:latest" {
+				t.Fatalf("resolved image reference = %q", reference)
+			}
+			return image, nil
+		}),
+	)
+	if err := df.AddStage(
+		From(Image("example/base:latest"), As("image")),
+		Run(Sh("echo $BASE_SETTING")),
+		Cmd(Sh("echo $BASE_SETTING")),
+	); err != nil {
+		t.Fatal(err)
+	}
+	result, err := df.Build(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := result.Target.Env["BASE_SETTING"]; got != "present" {
+		t.Fatalf("image ENV = %q", got)
+	}
+	if got := result.Target.Image.Config.WorkingDir; got != "/workspace" {
+		t.Fatalf("image WORKDIR = %q", got)
+	}
+	want := []string{"/bin/bash", "-e", "-c", "echo $BASE_SETTING"}
+	if strings.Join(result.Target.Image.Config.Cmd, "|") != strings.Join(want, "|") {
+		t.Fatalf("CMD = %#v, want %#v", result.Target.Image.Config.Cmd, want)
+	}
+}
+
+func TestRejectsStageDependencyCycles(t *testing.T) {
+	df := New()
+	if err := df.AddStage(From(StageOf("b"), As("a"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := df.AddStage(From(StageOf("a"), As("b"))); err != nil {
+		t.Fatal(err)
+	}
+	_, err := df.Build(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "circular stage dependency") {
+		t.Fatalf("expected dependency cycle error, got %v", err)
+	}
+}
+
+func TestVariableExpansionDoesNotConsumeBackslashesOrBackticks(t *testing.T) {
+	df := New()
+	if err := df.AddStage(
+		From(Scratch(), As("escape")),
 		Env([]KeyValue{
 			KV("VALUE", "expanded"),
-			KV("SLASH", "C:\\\\$VALUE"),
-			KV("TICK", "`$VALUE"),
+			KV("WINDOWS_PATH", "C:\\$VALUE"),
+			KV("BACKTICK", "`$VALUE"),
 		}),
-	); err != nil { t.Fatal(err) }
+	); err != nil {
+		t.Fatal(err)
+	}
 	result, err := df.Build(context.Background())
-	if err != nil { t.Fatal(err) }
-	if got := result.Target.Env["SLASH"]; got != "C:\\\\expanded" { t.Fatalf("backslash was treated as expansion escape: %q", got) }
-	if got := result.Target.Env["TICK"]; got != "`expanded" { t.Fatalf("backtick was treated as parser escape: %q", got) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := result.Target.Env["WINDOWS_PATH"]; got != "C:\\expanded" {
+		t.Fatalf("backslash was interpreted as an expansion escape: %q", got)
+	}
+	if got := result.Target.Env["BACKTICK"]; got != "`expanded" {
+		t.Fatalf("backtick was interpreted as parser syntax: %q", got)
+	}
 }
 
-func TestDefaultShellAndEntrypointCmdSemantics(t *testing.T) {
+func TestDefaultShellAndEntrypointCmdInheritance(t *testing.T) {
 	linux, err := commandArgs(Sh("echo ok"), nil, "linux")
-	if err != nil { t.Fatal(err) }
-	if len(linux) != 3 || linux[0] != "/bin/sh" || linux[1] != "-c" { t.Fatalf("linux shell = %#v", linux) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(linux) != 3 || linux[0] != "/bin/sh" || linux[1] != "-c" {
+		t.Fatalf("Linux default shell = %#v", linux)
+	}
 	windows, err := commandArgs(Sh("echo ok"), nil, "windows")
-	if err != nil { t.Fatal(err) }
-	if len(windows) != 3 || windows[0] != "cmd" || windows[1] != "/S" || windows[2] != "/C" { t.Fatalf("windows shell = %#v", windows) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(windows) != 3 || windows[0] != "cmd" || windows[1] != "/S" || windows[2] != "/C" {
+		t.Fatalf("Windows default shell = %#v", windows)
+	}
 
 	df := New()
-	if err := df.AddStage(From(Scratch(), As("base")), Cmd(Exec("old"))); err != nil { t.Fatal(err) }
-	if err := df.AddStage(From(StageOf("base")), Entrypoint(Exec("entry"))); err != nil { t.Fatal(err) }
+	if err := df.AddStage(
+		From(Scratch(), As("base")),
+		Cmd(Exec("old")),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := df.AddStage(
+		From(StageOf("base"), As("derived")),
+		Entrypoint(Exec("entry")),
+	); err != nil {
+		t.Fatal(err)
+	}
 	result, err := df.Build(context.Background())
-	if err != nil { t.Fatal(err) }
-	if len(result.Target.Image.Config.Cmd) != 0 { t.Fatalf("inherited CMD should be cleared by ENTRYPOINT: %#v", result.Target.Image.Config.Cmd) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Target.Image.Config.Cmd) != 0 {
+		t.Fatalf("ENTRYPOINT should clear inherited CMD: %#v", result.Target.Image.Config.Cmd)
+	}
 }
 
-func TestRunAcceptsMountsAndExecutionOptions(t *testing.T) {
+func TestRunMountsAndExecutionOptions(t *testing.T) {
 	df := New()
 	if err := df.AddStage(
 		From(Scratch()),
 		Run(
-			Sh("echo build"),
+			Sh("go test ./..."),
 			Mounts(
 				Bind("/src", nil, ".", false),
-				Cache("/root/.cache", CacheID("golang"), CacheSharing(llb.CacheMountLocked)),
+				Cache("/root/.cache", CacheID("go-build"), CacheSharing(llb.CacheMountLocked)),
+				Cache("/go/pkg/mod", CacheID("go-mod"), CacheOwnership(1000, 1000, 0o755)),
 				Tmpfs("/tmp", 64<<20),
 				Secret("token", "/run/secrets/token", SecretRequired()),
-				SSH("default", ""),
+				Secret("registry-password", "", SecretEnv("REGISTRY_PASSWORD"), SecretOptional()),
+				SSH("default", "", SSHSocket(1000, 1000, 0o600)),
 			),
 			Network(NetworkNone),
-			Security(SecuritySandbox),
+			Security(SecurityInsecure),
+			ReadOnlyRootFS(),
 			Devices(Device("vendor.example/device=accelerator", true)),
-			Ulimits(UlimitSpec{Name: llb.UlimitName("nofile"), Soft: 1024, Hard: 2048}),
+			Ulimits(Ulimit{Name: llb.UlimitName("nofile"), Soft: 1024, Hard: 2048}),
 		),
-	); err != nil { t.Fatal(err) }
-	if _, err := df.Build(context.Background()); err != nil { t.Fatal(err) }
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := df.Build(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 }
 
-type testCustomSpec struct {
-	Common
-	Value string
+func TestInstructionClosureUpdatesLLBAndImageConfig(t *testing.T) {
+	custom := NewInstruction("ANNOTATE", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+		state.LLB = state.LLB.AddEnv("CUSTOM_VALUE", "present")
+		if state.Env == nil {
+			state.Env = make(map[string]string)
+		}
+		state.Env["CUSTOM_VALUE"] = "present"
+		if state.Image.Config.Labels == nil {
+			state.Image.Config.Labels = make(map[string]string)
+		}
+		state.Image.Config.Labels["example.com/custom"] = "present"
+		return nil
+	}, WithDescription("ANNOTATE custom metadata"), WithProgressGroup("custom"))
+	df := New()
+	if err := df.AddStage(From(Scratch(), As("custom")), custom); err != nil {
+		t.Fatal(err)
+	}
+	result, err := df.Build(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := result.Target.Env["CUSTOM_VALUE"]; got != "present" {
+		t.Fatalf("closure did not update state environment: %q", got)
+	}
+	if got := result.Target.Image.Config.Labels["example.com/custom"]; got != "present" {
+		t.Fatalf("closure did not update OCI image config: %q", got)
+	}
 }
-func (s testCustomSpec) String() string { return "CUSTOM " + s.Value }
 
-func TestCustomInstructionRegistration(t *testing.T) {
-	h := NewLLBHandlers()
-	err := RegisterHandler(h, Kind("CUSTOM"), func(_ context.Context, call Call[testCustomSpec]) (Stage, error) {
-		stage := call.Stage
-		if stage.Image.Config.Labels == nil { stage.Image.Config.Labels = map[string]string{} }
-		stage.Image.Config.Labels["custom"] = call.Spec.Value
-		return stage, nil
+func TestInstructionApplyRollsBackStateOnError(t *testing.T) {
+	wantErr := errors.New("deliberate failure")
+	instruction := NewInstruction("FAIL", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+		state.Env["LEAK"] = "no"
+		if state.Image.Config.Labels == nil {
+			state.Image.Config.Labels = make(map[string]string)
+		}
+		state.Image.Config.Labels["leak"] = "no"
+		state.LLB = state.LLB.AddEnv("LEAK", "no")
+		return wantErr
 	})
-	if err != nil { t.Fatal(err) }
-	in := NewTrigger(Kind("CUSTOM"), "CUSTOM", testCustomSpec{Value: "registered"})
-	stage, err := Compose(context.Background(), h, NewRuntime(), NewStageInit(KindFrom, "FROM", FromSpec{
-		Base: Scratch(), Name: "custom-stage",
-	}), in)
-	if err != nil { t.Fatal(err) }
-	if got := stage.Image.Config.Labels["custom"]; got != "registered" { t.Fatalf("custom label = %q", got) }
+	initial := State{
+		LLB: llb.Scratch(), Image: emptyImage(testPlatform()),
+		Env: map[string]string{"KEEP": "yes"},
+	}
+	next, err := instruction.Apply(context.Background(), initial, nil)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("error = %v, want %v", err, wantErr)
+	}
+	if _, ok := initial.Env["LEAK"]; ok {
+		t.Fatal("failed instruction mutated caller's state")
+	}
+	if _, ok := next.Env["LEAK"]; ok {
+		t.Fatal("failed instruction returned partially-mutated state")
+	}
+	if got := next.Env["KEEP"]; got != "yes" {
+		t.Fatalf("existing state was not preserved: %q", got)
+	}
 }
 
-var _ = llb.CacheMountShared
+func TestInstructionAndStageHooksAreScoped(t *testing.T) {
+	var sequence []string
+	instruction := NewInstruction("MARK", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+		state.Image.Author = "test"
+		return nil
+	}, WithInstructionHooks(InstructionHooks{
+		Before: func(context.Context, InstructionEvent) error {
+			sequence = append(sequence, "instruction-before")
+			return nil
+		},
+		After: func(context.Context, InstructionEvent) error {
+			sequence = append(sequence, "instruction-after")
+			return nil
+		},
+	}))
+	df := New()
+	if err := df.AddStagePlan(Plan(
+		From(Scratch(), As("hooks")),
+		[]Instruction{instruction},
+		WithStageHooks(StageHooks{
+			Before: func(context.Context, StageEvent) error {
+				sequence = append(sequence, "stage-before")
+				return nil
+			},
+			After: func(context.Context, StageEvent) error {
+				sequence = append(sequence, "stage-after")
+				return nil
+			},
+		}),
+	)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := df.Build(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"stage-before", "instruction-before", "instruction-after", "stage-after"}
+	if strings.Join(sequence, ",") != strings.Join(want, ",") {
+		t.Fatalf("hook order = %v, want %v", sequence, want)
+	}
+}
+
+func TestProgressIncludesInstructionAndStageTotals(t *testing.T) {
+	var events []progress.Event
+	df := New(WithProgressReporter(progress.ReporterFunc(func(_ context.Context, event progress.Event) error {
+		events = append(events, event)
+		return nil
+	})))
+	if err := df.AddStage(
+		From(Scratch(), As("progress")),
+		Env([]KeyValue{KV("A", "1")}),
+		Run(Exec("true")),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := df.Build(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	started := 0
+	completed := 0
+	for _, event := range events {
+		if event.StageName != "progress" {
+			continue
+		}
+		if event.Phase == progress.Started {
+			started++
+			if event.StageTotal != 1 {
+				t.Fatalf("stage total = %d", event.StageTotal)
+			}
+		}
+		if event.Phase == progress.Completed {
+			completed++
+			if event.InstructionTotal < 3 {
+				t.Fatalf("instruction total = %d, want FROM + ENV + RUN", event.InstructionTotal)
+			}
+		}
+	}
+	if started == 0 || completed == 0 {
+		t.Fatalf("expected started and completed events; got %d and %d", started, completed)
+	}
+}
+
+func testPlatform() ocispecs.Platform {
+	return ocispecs.Platform{OS: "linux", Architecture: "amd64"}
+}
