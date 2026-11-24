@@ -75,6 +75,9 @@ func initializeFrom(
 				return fmt.Errorf("resolve FROM image config: %w", err)
 			}
 			image = cloneImage(resolved)
+			if image.Config.WorkingDir == "" {
+				image.Config.WorkingDir = "/"
+			}
 			rawOnBuild = append([]string(nil), image.Config.OnBuild...)
 			configBytes, err := json.Marshal(image)
 			if err != nil {

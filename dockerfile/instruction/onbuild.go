@@ -10,7 +10,7 @@ import (
 // trigger in the declaring stage; a derived stage executes it immediately
 // after its FROM closure resolves.
 func OnBuild(trigger Instruction) Instruction {
-	return newMutationInstruction("ONBUILD", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
+	triggerInstruction := newMutationInstruction("ONBUILD", func(_ context.Context, state *State, _ *Runtime, _ InstructionMetadata) error {
 		if !trigger.Valid() {
 			return errors.New("ONBUILD trigger has no action")
 		}
@@ -26,5 +26,5 @@ func OnBuild(trigger Instruction) Instruction {
 		state.Image.Config.OnBuild = append(state.Image.Config.OnBuild, expression)
 		return nil
 	}, WithDescription("ONBUILD "+trigger.String()), WithHistoryMode(HistorySkip), WithDeferredDependencies())
-	return instruction.With(DependsOn(trigger.Dependencies()...))
+	return triggerInstruction.With(DependsOn(trigger.Dependencies()...))
 }

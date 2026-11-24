@@ -1,6 +1,7 @@
 package instruction
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -337,4 +338,12 @@ func addSourceText(source AddSource) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported ADD source type %T", source)
 	}
+}
+
+func jsonMarshal(value any) (string, error) {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+	return string(encoded), nil
 }

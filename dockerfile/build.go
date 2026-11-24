@@ -185,7 +185,7 @@ func (d *Dockerfile) newRuntime() *Runtime {
 		BuildArgs: maps.Clone(d.buildArgs),
 		GlobalArgs: defaultPlatformArgs(d.Platform),
 		BuildContext: d.buildContext,
-		NamedContexts: cloneNamedContexts(d.namedContexts),
+		NamedContexts: cloneNamedContexts(d.namedContexts, d.Platform),
 		Platform: d.Platform,
 		CreatedAt: cloneCreatedAt(d.createdAt),
 		CacheIDNamespace: d.cacheIDNamespace,
@@ -435,11 +435,15 @@ func cloneStates(source map[StageName]State) map[StageName]State {
 	return out
 }
 
-func cloneNamedContexts(source map[string]NamedContext) map[string]NamedContext {
+func cloneNamedContexts(source map[string]NamedContext, defaultPlatform ocispecs.Platform) map[string]NamedContext {
 	out := make(map[string]NamedContext, len(source))
 	for name, value := range source {
 		value.Image = cloneImage(value.Image)
 		value.Platform.OSFeatures = append([]string(nil), value.Platform.OSFeatures...)
+		if value.Platform.OS == "" {
+			value.Platform = defaultPlatform
+			value.Platform.OSFeatures = append([]string(nil), defaultPlatform.OSFeatures...)
+		}
 		out[name] = value
 	}
 	return out

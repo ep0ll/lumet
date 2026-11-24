@@ -90,7 +90,7 @@ func WithBuildContext(state llb.State) BuildOption {
 }
 func WithNamedContext(name string, state llb.State) BuildOption {
 	return func(d *Dockerfile) {
-		d.namedContexts[name] = NamedContext{LLB: state, Platform: d.Platform}
+		d.namedContexts[name] = NamedContext{LLB: state}
 	}
 }
 func WithNamedContextImage(name string, state llb.State, image dockerspec.DockerOCIImage, platform ocispecs.Platform) BuildOption {
