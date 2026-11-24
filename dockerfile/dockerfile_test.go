@@ -179,6 +179,56 @@ func TestCopyFromCreatesStageDependency(t *testing.T) {
 	}
 }
 
+func TestFromStageReferenceCanExpandGlobalArg(t *testing.T) {
+	df := dockerfile.New()
+	if err := df.AddGlobal(instruction.Arg("BASE_STAGE", instruction.ArgDefault("assets"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := df.AddStage(
+		dockerfile.From(dockerfile.Scratch(), dockerfile.As("assets")),
+		instruction.Workdir("/assets"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := df.AddStage(
+		dockerfile.From(dockerfile.StageOf("$BASE_STAGE"), dockerfile.As("final")),
+	); err != nil {
+		t.Fatal(err)
+	}
+	result, err := df.Build(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := result.Stages["assets"]; !ok {
+		t.Fatal("stage selected by expanded FROM reference was not resolved")
+	}
+	if result.Target.BaseRef != "assets" {
+		t.Fatalf("base ref = %q, want assets", result.Target.BaseRef)
+	}
+}
+
+func TestFromNamedContextReferenceCanExpandGlobalArg(t *testing.T) {
+	df := dockerfile.New(
+		dockerfile.WithNamedContext("source", llb.Scratch()),
+	)
+	if err := df.AddGlobal(instruction.Arg("CONTEXT_NAME", instruction.ArgDefault("source"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := df.AddStage(
+		dockerfile.From(dockerfile.Context("$CONTEXT_NAME"), dockerfile.As("final")),
+		instruction.Workdir("/workspace"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	result, err := df.Build(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Target.BaseRef != "context:source" {
+		t.Fatalf("base ref = %q, want context:source", result.Target.BaseRef)
+	}
+}
+
 func TestCopyFromStageNameCanExpandFromArg(t *testing.T) {
 	df := dockerfile.New()
 	if err := df.AddStage(
@@ -317,6 +367,7 @@ func TestRunMountsAndExecutionOptions(t *testing.T) {
 				instruction.Tmpfs("/tmp", 64<<20),
 				instruction.Secret("token", "/run/secrets/token", instruction.SecretRequired()),
 				instruction.Secret("registry-password", "", instruction.SecretEnv("REGISTRY_PASSWORD"), instruction.SecretOptional()),
+				instruction.Secret("dual-secret", "/run/secrets/dual", instruction.SecretEnv("DUAL_SECRET")),
 				instruction.SSH("default", "", instruction.SSHSocket(1000, 1000, 0o600)),
 			),
 			instruction.Network(instruction.NetworkNone),

@@ -172,7 +172,7 @@ func fromEmptyState(runtime *Runtime) llb.State {
 }
 
 func baseDependencies(base Base) []StageName {
-	if stage, ok := base.(StageRef); ok {
+	if stage, ok := base.(StageRef); ok && !strings.Contains(string(stage.Name), "$") {
 		return []StageName{stage.Name}
 	}
 	return nil

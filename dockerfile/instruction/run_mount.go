@@ -289,7 +289,6 @@ func runMountOptions(runtime *Runtime, state *State, mount Mount) ([]llb.RunOpti
 			if err != nil {
 				return nil, err
 			}
-			destination = nil
 			options = append(options, llb.SecretAsEnvName(envName))
 		}
 		return []llb.RunOption{llb.AddSecretWithDest(id, destination, options...)}, nil

@@ -96,7 +96,11 @@ func initializeFrom(
 		if runtime.ResolveStage == nil {
 			return errors.New("FROM stage reference requires a stage resolver")
 		}
-		parent, err := runtime.ResolveStage(value.Name)
+		name, err := runtime.Expand(string(value.Name), &State{Platform: platform})
+		if err != nil {
+			return fmt.Errorf("expand FROM stage reference: %w", err)
+		}
+		parent, err := runtime.ResolveStage(StageName(name))
 		if err != nil {
 			return err
 		}
@@ -112,9 +116,13 @@ func initializeFrom(
 		rawOnBuild = append([]string(nil), parent.RawOnBuild...)
 
 	case ContextRef:
-		named, ok := runtime.NamedContexts[value.Name]
+		name, err := runtime.Expand(value.Name, &State{Platform: platform})
+		if err != nil {
+			return fmt.Errorf("expand FROM named context reference: %w", err)
+		}
+		named, ok := runtime.NamedContexts[name]
 		if !ok {
-			return fmt.Errorf("named context %q not found", value.Name)
+			return fmt.Errorf("named context %q not found", name)
 		}
 		llbState = named.LLB
 		image = cloneImage(named.Image)
@@ -132,7 +140,7 @@ func initializeFrom(
 		if config.platform == nil && named.Platform.OS != "" {
 			platform = named.Platform
 		}
-		baseRef = "context:" + value.Name
+		baseRef = "context:" + name
 		rawOnBuild = append([]string(nil), image.Config.OnBuild...)
 
 	default:

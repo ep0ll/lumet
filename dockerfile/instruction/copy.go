@@ -169,9 +169,13 @@ func resolveCopySource(runtime *Runtime, state *State, source CopySource) (llb.S
 		}
 		return resolved.LLB, nil
 	case ContextRef:
-		named, ok := runtime.NamedContexts[value.Name]
+		name, err := runtime.Expand(value.Name, state)
+		if err != nil {
+			return llb.State{}, fmt.Errorf("expand named context reference: %w", err)
+		}
+		named, ok := runtime.NamedContexts[name]
 		if !ok {
-			return llb.State{}, fmt.Errorf("named context %q not found", value.Name)
+			return llb.State{}, fmt.Errorf("named context %q not found", name)
 		}
 		return named.LLB, nil
 	case ImageRef:
