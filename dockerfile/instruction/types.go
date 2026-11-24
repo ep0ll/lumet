@@ -9,8 +9,13 @@ type (
 	State               = dockerfile.State
 	Runtime             = dockerfile.Runtime
 	Instruction         = dockerfile.Instruction
+	InstructionAction   = dockerfile.InstructionAction
 	InstructionMetadata = dockerfile.InstructionMetadata
 	InstructionOption   = dockerfile.InstructionOption
+	InstructionHooks    = dockerfile.InstructionHooks
+	InstructionEvent    = dockerfile.InstructionEvent
+	HistoryFunc         = dockerfile.HistoryFunc
+	HistoryEvent        = dockerfile.HistoryEvent
 	StageName           = dockerfile.StageName
 	CopySource          = dockerfile.CopySource
 	StageRef            = dockerfile.StageRef
@@ -19,11 +24,22 @@ type (
 	HistoryMode         = dockerfile.HistoryMode
 )
 
-const HistorySkip = dockerfile.HistorySkip
+const (
+	HistoryDefault    = dockerfile.HistoryDefault
+	HistoryLayer      = dockerfile.HistoryLayer
+	HistoryEmptyLayer = dockerfile.HistoryEmptyLayer
+	HistorySkip       = dockerfile.HistorySkip
+)
 
 var (
-	WithDescription       = dockerfile.WithDescription
-	WithOnBuildExpression = dockerfile.WithOnBuildExpression
+	WithDescription          = dockerfile.WithDescription
+	WithProgressGroup        = dockerfile.WithProgressGroup
+	WithProgressTitle        = dockerfile.WithProgressTitle
+	WithCustomName            = dockerfile.WithCustomName
+	WithInstructionConstraints = dockerfile.WithInstructionConstraints
+	WithInstructionHooks      = dockerfile.WithInstructionHooks
+	WithHistory               = dockerfile.WithHistory
+	WithOnBuildExpression    = dockerfile.WithOnBuildExpression
 	DependsOn             = dockerfile.DependsOn
 	WithGlobalARG         = dockerfile.WithGlobalARG
 	WithDeferredDependencies = dockerfile.WithDeferredDependencies
