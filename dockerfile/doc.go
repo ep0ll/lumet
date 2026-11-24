@@ -1,67 +1,57 @@
-// Package dockerfile builds Dockerfile-like instruction sequences directly
-// as BuildKit LLB graphs and Docker OCI image metadata.
+// Package dockerfile builds BuildKit LLB graphs from typed, functional
+// instruction values. It is not a Dockerfile text parser.
 //
-// The package is intentionally a builder API, not a Dockerfile text parser.
-// Each instruction constructor returns an Instruction, a function that receives
-// a context and the mutable build coordinator:
+// The package separates four scopes: instruction specifications carry
+// instruction-local options; StagePlan owns stage-local bindings and hooks;
+// Dockerfile owns global ARG scope, contexts, the stage DAG and target;
+// dockerfile/expand and dockerfile/progress provide independent contracts.
 //
-//	build := dockerfile.New(
-//		dockerfile.WithPlatform(platform),
-//		dockerfile.WithBuildContext(llb.Local("context")),
-//		dockerfile.WithImageResolver(resolveBaseImageConfig),
+// Instructions are immutable descriptions. RegisterHandler binds a kind to
+// a typed handler, and NewLLBHandlers provides standard BuildKit handlers.
+// Applications can replace a binding or register new instruction kinds.
+//
+// No Dockerfile source escape token is interpreted here. Backslashes and
+// backticks are ordinary variable-expansion input. dockerfile/expand supports
+// dollar-prefixed names, braced variables, default/alternate/required
+// operators and double-dollar for a literal dollar sign.
+//
+// Example:
+//
+//	df := dockerfile.New(
+//	    dockerfile.WithBuildArgs(map[string]string{"GO_VERSION": "1.24"}),
+//	    dockerfile.WithImageResolver(resolveImageConfig),
 //	)
-//	err := build.Apply(ctx,
-//		dockerfile.From("golang:1.26", dockerfile.As("builder")),
-//		dockerfile.Workdir("/src"),
-//		dockerfile.Copy([]string{"go.mod", "go.sum"}, "."),
-//		dockerfile.Run(dockerfile.Sh("go mod download")),
-//		dockerfile.Copy([]string{"."}, "."),
-//		dockerfile.Run(dockerfile.Exec("go", "build", "-o", "/out/app", ".")),
-//		dockerfile.From("scratch", dockerfile.As("runtime")),
-//		dockerfile.Copy([]string{"/out/app"}, "/app", dockerfile.CopyFrom("builder")),
-//		dockerfile.Entrypoint(dockerfile.Exec("/app")),
+//	err := df.AddStage(
+//	    dockerfile.From(dockerfile.Image("golang:$GO_VERSION"), dockerfile.As("build")),
+//	    dockerfile.Workdir("/src"),
+//	    dockerfile.Copy(dockerfile.Sources{"."}, "."),
+//	    dockerfile.Run(
+//	        dockerfile.Sh("go build ./..."),
+//	        dockerfile.Mounts(
+//	            dockerfile.Cache("/go/pkg/mod", dockerfile.CacheID("gomod")),
+//	            dockerfile.Secret("private-token", "/run/secrets/token"),
+//	            dockerfile.SSH("default", ""),
+//	            dockerfile.Tmpfs("/tmp", 64<<20),
+//	        ),
+//	    ),
 //	)
-//	if err != nil {
-//		return err
-//	}
-//	result := build.Result()
+//	if err != nil { return err }
+//	err = df.AddStage(
+//	    dockerfile.From(dockerfile.Image("alpine:3.21"), dockerfile.As("runtime")),
+//	    dockerfile.Copy(
+//	        dockerfile.Sources{"/src/app"}, "/usr/local/bin/app",
+//	        dockerfile.CopyFrom(dockerfile.StageOf("build")),
+//	    ),
+//	    dockerfile.Entrypoint(dockerfile.Exec("/usr/local/bin/app")),
+//	)
+//	if err != nil { return err }
+//	result, err := df.Build(ctx)
+//	if err != nil { return err }
+//	_ = result.Target.State
+//	_ = result.Target.Image // OCI image config: Env, Cmd, Entrypoint, Labels...
 //
-// A Build owns the current LLB state, image config, declared build arguments,
-// named contexts and completed stages. Apply executes instructions in order.
-// The LLB State itself is immutable; each instruction replaces it with the
-// next state graph. A Build must not be mutated concurrently.
-//
-// Base image filesystem resolution is still represented by llb.Image. To
-// populate Build.Image with the base image's Docker-specific config (Env,
-// WorkingDir, Shell, Cmd, Entrypoint, labels, health check and other metadata),
-// install an ImageResolver. The resolver should return the config for the same
-// reference and target platform that BuildKit will resolve. Without it, the
-// LLB graph can still resolve the image, but Build.Image starts with empty
-// metadata for that external base image.
-//
-// Variable expansion is provided by the independent dockerfile/expand package.
-// WithEscapeToken selects backslash or backtick source escaping, while
-// WithVariableExpander allows callers to replace the expansion strategy.
-// The expander receives a per-instruction lookup, so it does not own or mutate
-// the Build environment.
-//
-// Apply emits started, completed and failed events through a progress.Reporter.
-// Events include instruction position, stage position, stage name and target
-// platform. WithProgressReporter connects the event stream to a CLI, telemetry
-// system, BuildKit UI adapter or any other consumer. RUN accepts ProgressGroup
-// and ProgressTitle instruction options for finer-grained presentation.
-//
-// BuildKit-specific behavior is deliberately exposed instead of being copied
-// into this package. RunOptions forwards llb.RunOption values (mounts, network,
-// security, secrets, SSH, ulimits and devices); CopyOptions and LLBConstraints
-// forward the corresponding BuildKit extension points. InstructionOptions is
-// public so callers can define reusable options and future instruction flags
-// can be added without changing the instruction constructor signatures.
-//
-// ONBUILD writes trigger expressions to the image config for a downstream
-// Dockerfile frontend to consume. This package does not parse Dockerfile text,
-// so it does not interpret or execute pre-existing ONBUILD trigger strings.
-//
-// StopSignal accepts os.Signal. On Unix, syscall.Signal values are stored as
-// their numeric signal numbers; other os.Signal implementations use String().
+// ONBUILD triggers are typed. They are stored on the parent image and replayed
+// when a derived stage starts, after FROM resolution and before its own body.
+// For an external base image containing raw Config.OnBuild strings, configure
+// WithOnBuildDecoder to turn them into typed Trigger values.
 package dockerfile

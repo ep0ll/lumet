@@ -3,450 +3,144 @@ package dockerfile
 import (
 	"context"
 	"strings"
-	"syscall"
 	"testing"
-	"time"
 
 	"github.com/moby/buildkit/client/llb"
-	"github.com/ep0ll/lumet/dockerfile/expand"
-	"github.com/ep0ll/lumet/dockerfile/progress"
-	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
-	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func TestInstructionPipelineMetadata(t *testing.T) {
-	ctx := context.Background()
-	createdAt := time.Date(2025, time.January, 2, 3, 4, 5, 0, time.UTC)
-	build := New(
-		WithPlatform(ocispecs.Platform{OS: "linux", Architecture: "amd64"}),
-		WithBuildArgs(map[string]string{"VERSION": "2.4.1"}),
-		WithCreatedAt(createdAt),
-	)
+func TestDockerfileExpandsGlobalArgInFromAndStageEnv(t *testing.T) {
+	df := New()
+	if err := df.AddGlobal(Arg("BASE", ArgDefault("alpine:3.21"))); err != nil { t.Fatal(err) }
+	if err := df.AddStage(
+		From(Image("$BASE"), As("build")),
+		Env([]KeyValue{KV("APP", "service")}),
+		Workdir("/opt/$APP"),
+	); err != nil { t.Fatal(err) }
+	result, err := df.Build(context.Background())
+	if err != nil { t.Fatal(err) }
+	if got := result.Target.Base.Ref; got != "alpine:3.21" { t.Fatalf("base ref = %q", got) }
+	if got := result.Target.Image.Config.WorkingDir; got != "/opt/service" { t.Fatalf("working dir = %q", got) }
+	if got := result.Target.Env["APP"]; got != "service" { t.Fatalf("APP = %q", got) }
+}
 
-	err := build.Apply(ctx,
-		From("scratch", As("runtime")),
-		Arg("VERSION", ArgDefault("0.0.0")),
-		Env(KV("APP_VERSION", "$VERSION"), KV("APP_HOME", "/srv/app")),
-		Label(KV("org.opencontainers.image.version", "$APP_VERSION")),
-		Maintainer("Example Maintainer"),
-		Shell("/bin/sh", "-e", "-c"),
-		Cmd(Exec("server", "--port", "8080")),
-		Entrypoint(Exec("server")),
-		Expose("8080", "9000-9001/udp"),
-		Volume("/var/lib/app"),
-		User("10001:10001"),
-		Workdir("/srv/app"),
-		StopSignal(syscall.Signal(15)),
-		Healthcheck(
-			Exec("server", "health"),
-			HealthInterval(30*time.Second),
-			HealthTimeout(5*time.Second),
-			HealthStartPeriod(10*time.Second),
-			HealthRetries(3),
+func TestDockerfileOnBuildRunsInDerivedStageOnly(t *testing.T) {
+	df := New()
+	if err := df.AddStage(
+		From(Scratch(), As("parent")),
+		OnBuild(Env([]KeyValue{KV("TRIGGERED", "yes")})),
+	); err != nil { t.Fatal(err) }
+	if err := df.AddStage(
+		From(StageOf("parent"), As("child")),
+		Env([]KeyValue{KV("CHILD", "$TRIGGERED")}),
+	); err != nil { t.Fatal(err) }
+	result, err := df.Build(context.Background())
+	if err != nil { t.Fatal(err) }
+	parent := result.Stages["parent"]
+	child := result.Stages["child"]
+	if got := parent.Image.Config.OnBuild; len(got) != 1 || got[0] != "ENV TRIGGERED=yes" {
+		t.Fatalf("parent ONBUILD = %#v", got)
+	}
+	if len(child.Image.Config.OnBuild) != 0 { t.Fatalf("child ONBUILD was not consumed: %#v", child.Image.Config.OnBuild) }
+	if got := child.Env["TRIGGERED"]; got != "yes" { t.Fatalf("trigger did not run: %q", got) }
+	if got := child.Env["CHILD"]; got != "yes" { t.Fatalf("child ENV did not see trigger environment: %q", got) }
+}
+
+func TestDockerfileResolvesCopyFromDependency(t *testing.T) {
+	df := New()
+	if err := df.AddStage(From(Scratch(), As("assets")), Workdir("/build")); err != nil { t.Fatal(err) }
+	if err := df.AddStage(
+		From(Scratch(), As("final")),
+		Copy(Sources{"/out"}, "/app", CopyFrom(StageOf("assets"))),
+	); err != nil { t.Fatal(err) }
+	result, err := df.Build(context.Background())
+	if err != nil { t.Fatal(err) }
+	if _, ok := result.Stages["assets"]; !ok { t.Fatal("COPY --from dependency was not evaluated") }
+	if result.Target.State.Output() == nil { t.Fatal("expected final LLB state output") }
+}
+
+func TestDockerfileRejectsStageDependencyCycle(t *testing.T) {
+	df := New()
+	if err := df.AddStage(From(StageOf("b"), As("a"))); err != nil { t.Fatal(err) }
+	if err := df.AddStage(From(StageOf("a"), As("b"))); err != nil { t.Fatal(err) }
+	_, err := df.Build(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "circular stage dependency") { t.Fatalf("expected cycle error, got %v", err) }
+}
+
+func TestFunctionalExpansionDoesNotTreatEscapeCharactersAsSyntax(t *testing.T) {
+	df := New()
+	if err := df.AddStage(
+		From(Scratch(), As("test")),
+		Env([]KeyValue{
+			KV("VALUE", "expanded"),
+			KV("SLASH", "C:\\\\$VALUE"),
+			KV("TICK", "`$VALUE"),
+		}),
+	); err != nil { t.Fatal(err) }
+	result, err := df.Build(context.Background())
+	if err != nil { t.Fatal(err) }
+	if got := result.Target.Env["SLASH"]; got != "C:\\\\expanded" { t.Fatalf("backslash was treated as expansion escape: %q", got) }
+	if got := result.Target.Env["TICK"]; got != "`expanded" { t.Fatalf("backtick was treated as parser escape: %q", got) }
+}
+
+func TestDefaultShellAndEntrypointCmdSemantics(t *testing.T) {
+	linux, err := commandArgs(Sh("echo ok"), nil, "linux")
+	if err != nil { t.Fatal(err) }
+	if len(linux) != 3 || linux[0] != "/bin/sh" || linux[1] != "-c" { t.Fatalf("linux shell = %#v", linux) }
+	windows, err := commandArgs(Sh("echo ok"), nil, "windows")
+	if err != nil { t.Fatal(err) }
+	if len(windows) != 3 || windows[0] != "cmd" || windows[1] != "/S" || windows[2] != "/C" { t.Fatalf("windows shell = %#v", windows) }
+
+	df := New()
+	if err := df.AddStage(From(Scratch(), As("base")), Cmd(Exec("old"))); err != nil { t.Fatal(err) }
+	if err := df.AddStage(From(StageOf("base")), Entrypoint(Exec("entry"))); err != nil { t.Fatal(err) }
+	result, err := df.Build(context.Background())
+	if err != nil { t.Fatal(err) }
+	if len(result.Target.Image.Config.Cmd) != 0 { t.Fatalf("inherited CMD should be cleared by ENTRYPOINT: %#v", result.Target.Image.Config.Cmd) }
+}
+
+func TestRunAcceptsMountsAndExecutionOptions(t *testing.T) {
+	df := New()
+	if err := df.AddStage(
+		From(Scratch()),
+		Run(
+			Sh("echo build"),
+			Mounts(
+				Bind("/src", nil, ".", false),
+				Cache("/root/.cache", CacheID("golang"), CacheSharing(llb.CacheMountLocked)),
+				Tmpfs("/tmp", 64<<20),
+				Secret("token", "/run/secrets/token", SecretRequired()),
+				SSH("default", ""),
+			),
+			Network(NetworkNone),
+			Security(SecuritySandbox),
+			Devices(Device("vendor.example/device=accelerator", true)),
+			Ulimits(UlimitSpec{Name: llb.UlimitName("nofile"), Soft: 1024, Hard: 2048}),
 		),
-		OnBuild("RUN server migrate"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	image := build.Image
-	if image.Config.Env[0] != "APP_VERSION=2.4.1" {
-		t.Fatalf("unexpected environment: %#v", image.Config.Env)
-	}
-	if image.Config.Labels["org.opencontainers.image.version"] != "2.4.1" {
-		t.Fatalf("label was not expanded: %#v", image.Config.Labels)
-	}
-	if image.Author != "Example Maintainer" {
-		t.Fatalf("unexpected author: %q", image.Author)
-	}
-	if got := image.Config.Cmd; len(got) != 3 || got[0] != "server" {
-		t.Fatalf("unexpected CMD: %#v", got)
-	}
-	if got := image.Config.Entrypoint; len(got) != 1 || got[0] != "server" {
-		t.Fatalf("unexpected ENTRYPOINT: %#v", got)
-	}
-	if _, ok := image.Config.ExposedPorts["8080/tcp"]; !ok {
-		t.Fatalf("TCP port was not exposed: %#v", image.Config.ExposedPorts)
-	}
-	if _, ok := image.Config.ExposedPorts["9001/udp"]; !ok {
-		t.Fatalf("UDP port range was not expanded: %#v", image.Config.ExposedPorts)
-	}
-	if _, ok := image.Config.Volumes["/var/lib/app"]; !ok {
-		t.Fatalf("volume was not recorded: %#v", image.Config.Volumes)
-	}
-	if image.Config.User != "10001:10001" || image.Config.WorkingDir != "/srv/app" {
-		t.Fatalf("unexpected runtime config: user=%q workdir=%q", image.Config.User, image.Config.WorkingDir)
-	}
-	if image.Config.StopSignal != "15" {
-		t.Fatalf("expected numeric standard-library signal, got %q", image.Config.StopSignal)
-	}
-	if health := image.Config.Healthcheck; health == nil || health.Retries != 3 || health.Interval != 30*time.Second {
-		t.Fatalf("unexpected healthcheck: %#v", health)
-	}
-	if len(image.Config.OnBuild) != 1 || image.Config.OnBuild[0] != "RUN server migrate" {
-		t.Fatalf("unexpected ONBUILD triggers: %#v", image.Config.OnBuild)
-	}
-	if image.Created == nil || !image.Created.Equal(createdAt) {
-		t.Fatalf("created timestamp was not set: %#v", image.Created)
-	}
-	if len(image.History) != 13 {
-		t.Fatalf("expected history for all history-producing instructions after FROM, got %d", len(image.History))
-	}
-	if stage, ok := build.Stage("RUNTIME"); !ok || stage.Name != "runtime" {
-		t.Fatalf("current named stage is unavailable: %#v, %v", stage, ok)
-	}
+	); err != nil { t.Fatal(err) }
+	if _, err := df.Build(context.Background()); err != nil { t.Fatal(err) }
 }
 
-func TestBaseImageMetadataResolver(t *testing.T) {
-	ctx := context.Background()
-	platform := ocispecs.Platform{OS: "linux", Architecture: "amd64"}
-	build := New(
-		WithPlatform(platform),
-		WithImageResolver(func(_ context.Context, reference string, got ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
-			if reference != "example/base:latest" || got.OS != platform.OS {
-				t.Fatalf("unexpected resolver input: %q %#v", reference, got)
-			}
-			image := emptyImage(platform)
-			image.Config.Env = []string{"PATH=/usr/bin"}
-			image.Config.WorkingDir = "/workspace"
-			image.Config.Shell = []string{"/bin/bash", "-c"}
-			return image, nil
-		}),
-	)
-	if err := build.Apply(ctx, From("example/base:latest")); err != nil {
-		t.Fatal(err)
-	}
-	if build.Image.Config.WorkingDir != "/workspace" || len(build.Image.Config.Shell) != 2 {
-		t.Fatalf("base image config was not inherited: %#v", build.Image.Config)
-	}
-	if err := build.Apply(ctx, Env(KV("PATH", "/opt/bin:$PATH"))); err != nil {
-		t.Fatal(err)
-	}
-	if got := build.Image.Config.Env[0]; got != "PATH=/opt/bin:/usr/bin" {
-		t.Fatalf("base environment was not inherited and expanded: %q", got)
-	}
+type testCustomSpec struct {
+	Common
+	Value string
 }
+func (s testCustomSpec) String() string { return "CUSTOM " + s.Value }
 
-func TestStagesAndCopyFrom(t *testing.T) {
-	build := New(
-		WithPlatform(ocispecs.Platform{OS: "linux", Architecture: "amd64"}),
-		WithBuildContext(llb.Local("source-context")),
-	)
-	err := build.Apply(context.Background(),
-		From("scratch", As("build")),
-		Workdir("/out"),
-		From("build", As("runtime")),
-		Copy([]string{"bin/app"}, "/usr/local/bin/", CopyFrom("BUILD")),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := build.Stage("build"); !ok {
-		t.Fatal("completed build stage was not retained")
-	}
-	if _, ok := build.Stage("runtime"); !ok {
-		t.Fatal("current runtime stage was not exposed")
-	}
-}
-
-func TestRunCopyAndAddInstructionsCompose(t *testing.T) {
-	build := New(
-		WithPlatform(ocispecs.Platform{OS: "linux", Architecture: "amd64"}),
-		WithBuildContext(llb.Local("context")),
-	)
-	err := build.Apply(context.Background(),
-		From("scratch"),
-		Copy([]string{"./src/main.go"}, "/app/", Parents(), Chmod(0o644)),
-		Copy([]string{"assets"}, "/app/", Link(), Chown("1000:1000")),
-		Copy([]string{"/etc/os-release"}, "/etc/", CopyFrom("busybox:latest")),
-		Add([]AddSource{
-			LocalSource("archive.tar"),
-			RemoteSource("https://example.com/assets.tar"),
-			GitSource("https://github.com/example/assets.git", "main", llb.KeepGitDir()),
-		}, "/opt/assets/", Unpack(true)),
-		Run(Sh("echo ready")),
-		Run(Exec("true"), CustomName("health probe")),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(build.Image.History) != 6 {
-		t.Fatalf("expected three COPY operations, ADD and two RUN history entries after FROM, got %d", len(build.Image.History))
-	}
-	definition, err := build.State.Marshal(context.Background())
-	if err != nil {
-		t.Fatalf("marshal LLB definition: %v", err)
-	}
-	if len(definition.Def) == 0 {
-		t.Fatal("expected a non-empty LLB definition")
-	}
-}
-
-func TestInvalidInstructionsReturnErrors(t *testing.T) {
-	build := New()
-	if err := build.Apply(context.Background(), Env(KV("A", "b"))); err == nil {
-		t.Fatal("ENV before FROM should fail")
-	}
-	if err := build.Apply(context.Background(), From("scratch"), Expose("70000/tcp")); err == nil {
-		t.Fatal("invalid port should fail")
-	}
-	if err := build.Apply(context.Background(), OnBuild("FROM alpine")); err == nil {
-		t.Fatal("ONBUILD FROM should fail")
-	}
-	if err := build.Apply(context.Background(), Healthcheck(Exec())); err == nil {
-		t.Fatal("empty healthcheck exec form should fail")
-	}
-}
-
-func TestInstructionOptionsCanBeExtended(t *testing.T) {
-	custom := func(options *InstructionOptions) {
-		options.CustomName = "custom-progress-name"
-		options.RunOptions = append(options.RunOptions, llb.WithCustomName("custom-progress-name"))
-	}
-	build := New()
-	if err := build.Apply(context.Background(),
-		From("scratch"),
-		Run(Sh("true"), custom),
-	); err != nil {
-		t.Fatal(err)
-	}
-}
-
-
-func TestArgScopeAcrossStages(t *testing.T) {
-	ctx := context.Background()
-	platform := ocispecs.Platform{OS: "linux", Architecture: "amd64"}
-	var resolvedReference string
-	build := New(
-		WithPlatform(platform),
-		WithBuildArgs(map[string]string{
-			"BASE_IMAGE": "example/base:1.0",
-		}),
-		WithImageResolver(func(_ context.Context, reference string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
-			resolvedReference = reference
-			return emptyImage(platform), nil
-		}),
-	)
-
-	err := build.Apply(ctx,
-		Arg("BASE_IMAGE", ArgDefault("example/fallback:latest")),
-		From("$BASE_IMAGE", As("build")),
-		Arg("BUILD_ONLY", ArgDefault("secret")),
-		Env(KV("PUBLIC_VALUE", "visible")),
-		From("build", As("runtime")),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolvedReference != "example/base:1.0" {
-		t.Fatalf("FROM did not use global ARG: %q", resolvedReference)
-	}
-	if value, ok, err := build.State.GetEnv(ctx, "BUILD_ONLY"); err != nil {
-		t.Fatal(err)
-	} else if !ok || value != "secret" {
-		t.Fatalf("ARG declared in a parent stage should be inherited: value=%q present=%v", value, ok)
-	}
-	if value, ok, err := build.State.GetEnv(ctx, "PUBLIC_VALUE"); err != nil {
-		t.Fatal(err)
-	} else if !ok || value != "visible" {
-		t.Fatalf("ENV should survive FROM from a previous stage: value=%q present=%v", value, ok)
-	}
-}
-
-
-func TestEnvInstructionExpandsAgainstPreviousEnvironment(t *testing.T) {
-	build := New()
-	err := build.Apply(context.Background(),
-		From("scratch"),
-		Env(
-			KV("FIRST", "one"),
-			KV("SECOND", "$FIRST"),
-		),
-		Env(KV("THIRD", "$FIRST")),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	values := make(map[string]string)
-	for _, entry := range build.Image.Config.Env {
-		key, value, ok := strings.Cut(entry, "=")
-		if ok {
-			values[key] = value
-		}
-	}
-	if values["FIRST"] != "one" {
-		t.Fatalf("unexpected FIRST: %q", values["FIRST"])
-	}
-	if values["SECOND"] != "" {
-		t.Fatalf("same-instruction variables should not see sibling assignments: %q", values["SECOND"])
-	}
-	if values["THIRD"] != "one" {
-		t.Fatalf("subsequent ENV should see prior assignments: %q", values["THIRD"])
-	}
-}
-
-func TestArgOverridesBaseImageEnvironment(t *testing.T) {
-	ctx := context.Background()
-	platform := ocispecs.Platform{OS: "linux", Architecture: "amd64"}
-	build := New(
-		WithPlatform(platform),
-		WithBuildArgs(map[string]string{"PATH": "/custom/bin"}),
-		WithImageResolver(func(_ context.Context, _ string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
-			image := emptyImage(platform)
-			image.Config.Env = []string{"PATH=/usr/bin"}
-			return image, nil
-		}),
-	)
-	err := build.Apply(ctx,
-		From("example/base:latest"),
-		Arg("PATH"),
-		Env(KV("PATH", "$PATH")),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := build.Image.Config.Env[0]; got != "PATH=/custom/bin" {
-		t.Fatalf("ARG should replace inherited base image environment until ENV overrides it: %q", got)
-	}
-}
-
-
-func TestHealthcheckDockerDefaults(t *testing.T) {
-	build := New()
-	if err := build.Apply(context.Background(),
-		From("scratch"),
-		Healthcheck(Sh("true")),
-	); err != nil {
-		t.Fatal(err)
-	}
-	health := build.Image.Config.Healthcheck
-	if health == nil {
-		t.Fatal("healthcheck config was not set")
-	}
-	if health.Interval != 30*time.Second || health.Timeout != 30*time.Second ||
-		health.StartPeriod != 0 || health.StartInterval != 5*time.Second ||
-		health.Retries != 3 {
-		t.Fatalf("unexpected Dockerfile healthcheck defaults: %#v", health)
-	}
-}
-
-
-func TestEntrypointClearsInheritedCmdUnlessCurrentStageSetsOne(t *testing.T) {
-	platform := ocispecs.Platform{OS: "linux", Architecture: "amd64"}
-	resolver := func(_ context.Context, _ string, _ ocispecs.Platform) (dockerspec.DockerOCIImage, error) {
-		image := emptyImage(platform)
-		image.Config.Cmd = []string{"base-command"}
-		return image, nil
-	}
-
-	build := New(WithPlatform(platform), WithImageResolver(resolver))
-	if err := build.Apply(context.Background(),
-		From("example/base:latest"),
-		Entrypoint(Exec("app")),
-	); err != nil {
-		t.Fatal(err)
-	}
-	if len(build.Image.Config.Cmd) != 0 {
-		t.Fatalf("ENTRYPOINT should clear an inherited CMD: %#v", build.Image.Config.Cmd)
-	}
-
-	build = New(WithPlatform(platform))
-	if err := build.Apply(context.Background(),
-		From("scratch"),
-		Cmd(Exec("default-arg")),
-		Entrypoint(Exec("app")),
-	); err != nil {
-		t.Fatal(err)
-	}
-	if len(build.Image.Config.Cmd) != 1 || build.Image.Config.Cmd[0] != "default-arg" {
-		t.Fatalf("ENTRYPOINT should preserve a CMD declared in this stage: %#v", build.Image.Config.Cmd)
-	}
-}
-
-
-func TestProgressEventsContainInstructionAndStageMetadata(t *testing.T) {
-	var events []progress.Event
-	reporter := progress.ReporterFunc(func(_ context.Context, event progress.Event) error {
-		events = append(events, event)
-		return nil
+func TestCustomInstructionRegistration(t *testing.T) {
+	h := NewLLBHandlers()
+	err := RegisterHandler(h, Kind("CUSTOM"), func(_ context.Context, call Call[testCustomSpec]) (Stage, error) {
+		stage := call.Stage
+		if stage.Image.Config.Labels == nil { stage.Image.Config.Labels = map[string]string{} }
+		stage.Image.Config.Labels["custom"] = call.Spec.Value
+		return stage, nil
 	})
-	platform := ocispecs.Platform{OS: "linux", Architecture: "arm64", Variant: "v8"}
-	build := New(WithPlatform(platform), WithProgressReporter(reporter))
-	if err := build.Apply(context.Background(),
-		From("scratch", As("builder")),
-		Run(Exec("true"), ProgressGroup("compile"), ProgressTitle("Compile application")),
-	); err != nil {
-		t.Fatal(err)
-	}
-	if len(events) != 4 {
-		t.Fatalf("expected start/completion for two instructions, got %d", len(events))
-	}
-	runDone := events[3]
-	if runDone.Phase != progress.Completed || runDone.Instruction != "Run" {
-		t.Fatalf("unexpected RUN completion event: %#v", runDone)
-	}
-	if runDone.InstructionIndex != 2 || runDone.InstructionTotal != 2 {
-		t.Fatalf("unexpected instruction position: %#v", runDone)
-	}
-	if runDone.StageName != "builder" || runDone.StageIndex != 1 || runDone.StageTotal != 1 {
-		t.Fatalf("unexpected stage metadata: %#v", runDone)
-	}
-	if runDone.Platform.OS != "linux" || runDone.Platform.Architecture != "arm64" || runDone.Platform.Variant != "v8" {
-		t.Fatalf("unexpected platform metadata: %#v", runDone.Platform)
-	}
-	if runDone.Group != "compile" || runDone.Message != "builder: Compile application" {
-		t.Fatalf("instruction progress options were not applied: %#v", runDone)
-	}
-	if events[0].Phase != progress.Started || !events[0].FinishedAt.IsZero() {
-		t.Fatalf("started event should not have a finish timestamp: %#v", events[0])
-	}
+	if err != nil { t.Fatal(err) }
+	in := NewTrigger(Kind("CUSTOM"), "CUSTOM", testCustomSpec{Value: "registered"})
+	stage, err := Compose(context.Background(), h, NewRuntime(), NewStageInit(KindFrom, "FROM", FromSpec{
+		Base: Scratch(), Name: "custom-stage",
+	}), in)
+	if err != nil { t.Fatal(err) }
+	if got := stage.Image.Config.Labels["custom"]; got != "registered" { t.Fatalf("custom label = %q", got) }
 }
 
-func TestBuildEscapeTokenIsConfigurable(t *testing.T) {
-	build := New(WithEscapeToken(rune(96)))
-	literal := string(rune(96)) + "$PATH"
-	if err := build.Apply(context.Background(),
-		From("scratch"),
-		Env(KV("PATH", "/usr/bin"), KV("LITERAL", literal)),
-	); err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range build.Image.Config.Env {
-		if entry == "LITERAL=$PATH" {
-			return
-		}
-	}
-	t.Fatalf("backtick escape was not honored: %#v", build.Image.Config.Env)
-}
-
-
-func TestVariableExpanderCanBeReplaced(t *testing.T) {
-	called := false
-	expander := VariableExpanderFunc(func(input string, lookup expand.Lookup, config expand.Config) (string, error) {
-		called = true
-		if input == "$BASE" {
-			value, ok := lookup("BASE")
-			if !ok || value != "/base" {
-				t.Fatalf("expander received wrong lookup: %q %v", value, ok)
-			}
-			return "custom:" + value, nil
-		}
-		return expand.New(config, lookup).Expand(input)
-	})
-	build := New(WithVariableExpander(expander))
-	if err := build.Apply(context.Background(),
-		From("scratch"),
-		Env(KV("BASE", "/base")),
-		Env(KV("VALUE", "$BASE")),
-	); err != nil {
-		t.Fatal(err)
-	}
-	if !called {
-		t.Fatal("custom variable expander was not called")
-	}
-	if got := build.Image.Config.Env[len(build.Image.Config.Env)-1]; got != "VALUE=custom:/base" {
-		t.Fatalf("custom expander result was not used: %q", got)
-	}
-}
+var _ = llb.CacheMountShared

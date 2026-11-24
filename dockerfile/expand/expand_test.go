@@ -2,37 +2,38 @@ package expand
 
 import "testing"
 
-func TestExpand(t *testing.T) {
-	expander := New(Config{}, MapLookup(map[string]string{
-		"NAME":  "lumet",
-		"EMPTY": "",
-	}))
-	tests := map[string]string{
-		"$NAME":                    "lumet",
-		"$" + "{NAME}":             "lumet",
-		"$" + "{MISSING:-fallback}": "fallback",
-		"$" + "{NAME:+yes}":         "yes",
-		"$$NAME":                   "$NAME",
-		"\\$NAME":                  "$NAME",
+func TestExpandVariableForms(t *testing.T) {
+	values := map[string]string{"SET": "value", "EMPTY": ""}
+	lookup := MapLookup(values)
+	expander := New(Config{}, lookup)
+	tests := []struct{ input, want string }{
+		{"$SET", "value"},
+		{"${SET}", "value"},
+		{"${UNSET-default}", "default"},
+		{"${EMPTY:-default}", "default"},
+		{"${SET+alternate}", "alternate"},
+		{"${EMPTY:+alternate}", ""},
+		{"$${SET}", "${SET}"},
+		{"C:\\\\$SET", "C:\\\\value"},
+		{"`$SET", "`value"},
 	}
-	for input, want := range tests {
-		got, err := expander.Expand(input)
-		if err != nil || got != want {
-			t.Errorf("Expand(%q) = %q, %v; want %q", input, got, err, want)
-		}
-	}
-}
-
-func TestBacktickEscape(t *testing.T) {
-	expander := New(Config{Escape: 96}, MapLookup(map[string]string{"N": "x"}))
-	got, err := expander.Expand(string(rune(96)) + "$N")
-	if err != nil || got != "$N" {
-		t.Fatalf("Expand with backtick escape = %q, %v", got, err)
+	for _, test := range tests {
+		got, err := expander.Expand(test.input)
+		if err != nil { t.Fatalf("Expand(%q): %v", test.input, err) }
+		if got != test.want { t.Errorf("Expand(%q) = %q, want %q", test.input, got, test.want) }
 	}
 }
 
-func TestStrictUnset(t *testing.T) {
-	if _, err := New(Config{Strict: true}, nil).Expand("$MISSING"); err == nil {
-		t.Fatal("expected unset-variable error")
-	}
+func TestExpandRequiredAndStrictUnset(t *testing.T) {
+	expander := New(Config{}, MapLookup(map[string]string{}))
+	if _, err := expander.Expand("${TOKEN:?token is required}"); err == nil { t.Fatal("expected required-variable error") }
+	strict := New(Config{Strict: true}, MapLookup(map[string]string{}))
+	if _, err := strict.Expand("$MISSING"); err == nil { t.Fatal("expected unset-variable error") }
+}
+
+func TestExpandPreserveUnset(t *testing.T) {
+	expander := New(Config{PreserveUnset: true}, MapLookup(map[string]string{}))
+	got, err := expander.Expand("left-$MISSING-${OTHER}")
+	if err != nil { t.Fatal(err) }
+	if got != "left-$MISSING-${OTHER}" { t.Fatalf("got %q", got) }
 }
