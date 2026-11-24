@@ -1,0 +1,35 @@
+name: Dockerfile API
+
+on:
+  push:
+    branches:
+      - feat/dockerfile-deep-refactor
+  pull_request:
+    paths:
+      - "dockerfile/**"
+      - "go.mod"
+      - "go.sum"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test Dockerfile packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test packages
+        run: go test ./dockerfile/...
+
+      - name: Vet packages
+        run: go vet ./dockerfile/...
