@@ -477,7 +477,9 @@ func testPlatform() ocispecs.Platform {
 }
 
 func testImage() dockerspec.DockerOCIImage {
-	image := dockerspec.DockerOCIImage{Image: ocispecs.Image{OS: "linux", Architecture: "amd64"}}
+	image := dockerspec.DockerOCIImage{}
+	image.OS = "linux"
+	image.Architecture = "amd64"
 	image.RootFS.Type = "layers"
 	image.Config.WorkingDir = "/"
 	return image
